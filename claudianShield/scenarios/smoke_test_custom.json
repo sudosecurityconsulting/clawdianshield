@@ -1,0 +1,29 @@
+{
+  "scenario_id": "smoke_test_custom_001",
+  "name": "Custom Behavior Smoke Test",
+  "class_name": "smoke_test",
+  "mode": "lab_only",
+  "behavior_profile": {
+    "hello_world_custom": true
+  },
+  "custom_behaviors": {
+    "hello_world_custom": [
+      {
+        "step_id": "echo_test",
+        "command": "echo 'Smoke test running custom behavior'"
+      }
+    ]
+  },
+  "expected_telemetry": {
+    "process_events": true
+  },
+  "custom_behavior_produces": {
+    "hello_world_custom": ["process_events"]
+  },
+  "safety_constraints": {
+    "lab_environment_only": true,
+    "no_real_exploit_logic": true,
+    "no_real_credential_attack_logic": true,
+    "no_unapproved_network_spread": true
+  }
+}

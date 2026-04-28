@@ -7,3 +7,7 @@ watchdog>=4.0.0
 
 # Terminal report formatting
 rich>=13.0.0
+
+# SOC/IR dashboard (dashboard/server.py)
+fastapi>=0.110.0
+uvicorn[standard]>=0.27.0

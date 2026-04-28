@@ -2,7 +2,23 @@
   "permissions": {
     "allow": [
       "Bash(chmod +x /home/sudopwnr/.claude/memory-bridge/teardown.sh /home/sudopwnr/.claude/memory-bridge/watch.sh)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(gh:*)",
+      "Bash(git:*)",
+      "Bash(mkdir:*)",
+      "Bash(ls:*)",
+      "Bash(python:*)",
+      "Bash(pip:*)",
+      "Bash(cd:*)",
+      "Bash(pwd:*)",
+      "Bash(echo:*)",
+      "Bash(winget list:*)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://127.0.0.1:8088/api/health)",
+      "Bash(curl -s -o /dev/null -w \"health=%{http_code}\\\\n\" http://127.0.0.1:8088/api/health)",
+      "Bash(curl -s -o /dev/null -w \"stats=%{http_code}\\\\n\" http://127.0.0.1:8088/api/stats)",
+      "Bash(curl -s -o /dev/null -w \"runs=%{http_code}\\\\n\" http://127.0.0.1:8088/api/runs)",
+      "Bash(curl -s -o /dev/null -w \"events=%{http_code}\\\\n\" http://127.0.0.1:8088/api/events)",
+      "Bash(curl -s -o /dev/null -w \"index=%{http_code}\\\\n\" http://127.0.0.1:8088/)"
     ]
   }
 }

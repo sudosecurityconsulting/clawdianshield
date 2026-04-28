@@ -177,6 +177,17 @@ BEHAVIOR_PRODUCES: dict[str, set[str]] = {
 def _validate_safety(scenario: dict[str, Any]) -> None:
     """Abort with exit code 1 if any safety constraint is not satisfied."""
     sc = scenario.get("safety_constraints", {})
+    mode = scenario.get("mode", "lab_only")
+
+    # Support for real execution of exploits
+    if mode == "real_exploit":
+        if not sc.get("i_know_what_i_am_doing", False):
+            print("[SAFETY] Real exploit mode requires 'i_know_what_i_am_doing: true' in safety_constraints.", file=sys.stderr)
+            sys.exit(1)
+        print("[SAFETY] WARNING: Proceeding with real exploit execution mode!", file=sys.stderr)
+        return
+
+    # Default strict lab limits
     violations: list[str] = []
     if not sc.get("lab_environment_only", False):
         violations.append("lab_environment_only must be true")
@@ -197,9 +208,19 @@ def _validate_safety(scenario: dict[str, Any]) -> None:
 # Execution helpers
 # ---------------------------------------------------------------------------
 
-def _resolve_plan(behavior_profile: dict[str, bool]) -> list[str]:
-    """Return active behaviors in deterministic attack-chain order."""
-    return [b for b in EXECUTION_ORDER if behavior_profile.get(b)]
+def _resolve_plan(scenario: dict[str, Any]) -> list[str]:
+    """Return active behaviors in deterministic attack-chain order or custom order."""
+    behavior_profile = scenario.get("behavior_profile", {})
+    order = scenario.get("execution_order", EXECUTION_ORDER)
+    
+    # Allow custom behaviors not in the default execution order to just be appended
+    # if they are active but not explicitly ordered
+    planned = [b for b in order if behavior_profile.get(b)]
+    for b, active in behavior_profile.items():
+        if active and b not in planned:
+            planned.append(b)
+            
+    return planned
 
 
 def _run_step(
@@ -257,6 +278,7 @@ def _run_step(
 def _compute_coverage(
     behaviors_run: list[str],
     expected_telemetry: dict[str, bool],
+    custom_produces: dict[str, list[str]] = None,
 ) -> tuple[dict[str, Any], list[str]]:
     """
     Returns (coverage_dict, coverage_gaps).
@@ -266,13 +288,19 @@ def _compute_coverage(
 
     coverage_gaps lists expected telemetry types that no executed behavior covers.
     """
+    if custom_produces is None:
+        custom_produces = {}
+        
     coverage: dict[str, Any] = {}
     gaps: list[str] = []
     for telemetry_type, expected in expected_telemetry.items():
-        producers = [
-            b for b in behaviors_run
-            if telemetry_type in BEHAVIOR_PRODUCES.get(b, set())
-        ]
+        producers = []
+        for b in behaviors_run:
+            built_in_produces = BEHAVIOR_PRODUCES.get(b, set())
+            custom_behavior_produces = set(custom_produces.get(b, []))
+            if telemetry_type in built_in_produces or telemetry_type in custom_behavior_produces:
+                producers.append(b)
+                
         coverage[telemetry_type] = {
             "expected": expected,
             "produced_by": producers,
@@ -338,7 +366,8 @@ def main() -> None:
 
     behavior_profile: dict[str, bool] = scenario.get("behavior_profile", {})
     expected_telemetry: dict[str, bool] = scenario.get("expected_telemetry", {})
-    behaviors_planned = _resolve_plan(behavior_profile)
+    behaviors_planned = _resolve_plan(scenario)
+    custom_behaviors = scenario.get("custom_behaviors", {})
 
     print(f"[{run_id}] Scenario : {scenario.get('name', scenario.get('scenario_id'))}")
     print(f"[{run_id}] Container: {args.container}")
@@ -349,7 +378,14 @@ def main() -> None:
     step_failures: list[dict[str, Any]] = []
 
     for behavior in behaviors_planned:
-        for step_id, command in BEHAVIOR_STEPS.get(behavior, []):
+        # If behavior is custom, load its steps, otherwise fall back to built-in BEHAVIOR_STEPS
+        if behavior in custom_behaviors:
+            steps_list = [(step.get("step_id", f"step_{i}"), step.get("command", "")) 
+                          for i, step in enumerate(custom_behaviors[behavior])]
+        else:
+            steps_list = BEHAVIOR_STEPS.get(behavior, [])
+            
+        for step_id, command in steps_list:
             print(f"[{run_id}]   {behavior}/{step_id}", end="", flush=True)
             result = _run_step(args.container, behavior, step_id, command, args.dry_run)
             steps.append(result)
@@ -364,7 +400,8 @@ def main() -> None:
                 })
 
     completed_at = datetime.now(timezone.utc).isoformat()
-    coverage, gaps = _compute_coverage(behaviors_planned, expected_telemetry)
+    custom_produces = scenario.get("custom_behavior_produces", {})
+    coverage, gaps = _compute_coverage(behaviors_planned, expected_telemetry, custom_produces)
 
     if args.dry_run:
         overall_status = "dry_run"

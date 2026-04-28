@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ClawdianShield — SOC Console</title>
+<link rel="stylesheet" href="/static/style.css" />
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="logo-mark"></span>
+    <div class="brand-text">
+      <div class="brand-title">CLAWDIAN_SHIELD</div>
+      <div class="brand-sub">SOC // INCIDENT RESPONSE CONSOLE — v3.1.0-ALPHA</div>
+    </div>
+  </div>
+  <nav class="topnav">
+    <a class="active" data-tab="overview">Overview</a>
+    <a data-tab="events">Live Stream</a>
+    <a data-tab="runs">Scenario Runs</a>
+    <a data-tab="attack">ATT&amp;CK Map</a>
+  </nav>
+  <div class="status-cluster">
+    <span class="status-pill ok"><span class="dot"></span> SENSORS ONLINE</span>
+    <span id="ws-pill" class="status-pill warn"><span class="dot"></span> WS CONNECTING</span>
+    <span class="clock" id="clock">--:--:-- UTC</span>
+  </div>
+</header>
+
+<main>
+  <!-- ===================== OVERVIEW ===================== -->
+  <section class="tab" id="tab-overview">
+    <div class="kpi-row">
+      <div class="kpi"><div class="kpi-label">EVENTS INGESTED</div><div class="kpi-value" id="kpi-total">0</div><div class="kpi-foot">last 500 buffered</div></div>
+      <div class="kpi crit"><div class="kpi-label">CRITICAL ALERTS</div><div class="kpi-value" id="kpi-critical">0</div><div class="kpi-foot">severity=critical</div></div>
+      <div class="kpi high"><div class="kpi-label">HIGH SEVERITY</div><div class="kpi-value" id="kpi-high">0</div><div class="kpi-foot">severity=high</div></div>
+      <div class="kpi"><div class="kpi-label">MEDIUM</div><div class="kpi-value" id="kpi-medium">0</div><div class="kpi-foot">severity=medium</div></div>
+      <div class="kpi"><div class="kpi-label">HOSTS REPORTING</div><div class="kpi-value" id="kpi-hosts">0</div><div class="kpi-foot">distinct sensors</div></div>
+      <div class="kpi"><div class="kpi-label">SCENARIO RUNS</div><div class="kpi-value" id="kpi-runs">0</div><div class="kpi-foot">recorded executions</div></div>
+    </div>
+
+    <div class="grid-2x2">
+      <div class="panel">
+        <div class="panel-head"><span>EVENT VOLUME OVER TIME</span><span class="panel-sub">stacked by severity · per minute</span></div>
+        <div class="panel-body"><canvas id="chart-timeseries"></canvas></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><span>EVENT TYPES</span><span class="panel-sub">distribution</span></div>
+        <div class="panel-body"><canvas id="chart-types"></canvas></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><span>SEVERITY MIX</span><span class="panel-sub">all collectors</span></div>
+        <div class="panel-body"><canvas id="chart-severity"></canvas></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><span>COLLECTOR FEEDS</span><span class="panel-sub">events per sensor</span></div>
+        <div class="panel-body"><canvas id="chart-collectors"></canvas></div>
+      </div>
+    </div>
+
+    <div class="grid-2c">
+      <div class="panel">
+        <div class="panel-head"><span>TOP MUTATED PATHS</span><span class="panel-sub">file_observer</span></div>
+        <table class="data-table" id="tbl-paths">
+          <thead><tr><th>path</th><th class="num">events</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><span>AUTH ACCOUNTS OBSERVED</span><span class="panel-sub">log_observer</span></div>
+        <table class="data-table" id="tbl-users">
+          <thead><tr><th>account</th><th class="num">events</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><span>ACTIVE SCENARIO PROFILE</span><span class="panel-sub" id="active-run-meta">no run loaded</span></div>
+      <div class="panel-body run-summary" id="active-run-summary">
+        <div class="empty-hint">Run a scenario via <code>python -m runner.executor scenarios/&lt;file&gt;.json</code> to populate this panel.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== LIVE STREAM ===================== -->
+  <section class="tab hidden" id="tab-events">
+    <div class="filterbar">
+      <div class="filter-group">
+        <label>SEVERITY</label>
+        <select id="f-severity">
+          <option value="">all</option>
+          <option value="critical">critical</option>
+          <option value="high">high</option>
+          <option value="medium">medium</option>
+          <option value="low">low</option>
+          <option value="info">info</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>EVENT TYPE</label>
+        <input id="f-type" placeholder="e.g. file_modify" />
+      </div>
+      <div class="filter-group">
+        <label>HOST</label>
+        <input id="f-host" placeholder="e.g. workstation-1" />
+      </div>
+      <div class="filter-group">
+        <label>SEARCH (raw)</label>
+        <input id="f-q" placeholder="substring match in details" />
+      </div>
+      <div class="filter-group toggle">
+        <label><input type="checkbox" id="f-pause" /> pause stream</label>
+      </div>
+      <div class="filter-tail" id="stream-stats">0 events · 0/s</div>
+    </div>
+    <div class="panel stream-panel">
+      <div class="panel-head">
+        <span>LIVE EVIDENCE STREAM</span>
+        <span class="panel-sub">tail evidence/*.jsonl over WebSocket</span>
+      </div>
+      <table class="data-table stream-table" id="tbl-events">
+        <thead>
+          <tr>
+            <th class="ts">timestamp</th>
+            <th>sev</th>
+            <th>host</th>
+            <th>collector</th>
+            <th>event_type</th>
+            <th>details</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ===================== RUNS ===================== -->
+  <section class="tab hidden" id="tab-runs">
+    <div class="grid-2c-tight">
+      <div class="panel">
+        <div class="panel-head"><span>SCENARIO RUNS</span><span class="panel-sub">reports/*_exec_log.json</span></div>
+        <table class="data-table" id="tbl-runs">
+          <thead><tr><th>run_id</th><th>scenario</th><th>status</th><th>started</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><span>RUN DETAIL</span><span class="panel-sub" id="run-detail-meta">select a run</span></div>
+        <div class="panel-body" id="run-detail">
+          <div class="empty-hint">Select a run from the list to inspect step-by-step execution and telemetry coverage.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== ATTACK MAP ===================== -->
+  <section class="tab hidden" id="tab-attack">
+    <div class="panel">
+      <div class="panel-head"><span>MITRE ATT&amp;CK COVERAGE</span><span class="panel-sub">techniques mapped to scenario behaviors</span></div>
+      <div class="panel-body">
+        <div class="attack-grid" id="attack-grid"></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><span>ACTIVE TECHNIQUES (LATEST RUN)</span><span class="panel-sub" id="active-attack-meta">no run loaded</span></div>
+      <div class="panel-body" id="active-attack-list"></div>
+    </div>
+  </section>
+</main>
+
+<footer class="bottombar">
+  <span>ClawdianShield Observer ⇆ Actor · read-only console</span>
+  <span id="ingest-rate">ingest 0 ev/s</span>
+  <span id="footer-host">--</span>
+</footer>
+
+<script src="/static/dashboard.js"></script>
+</body>
+</html>

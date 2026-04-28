@@ -144,6 +144,41 @@ Two output streams land per run:
 
 ---
 
+## SOC / IR Dashboard
+
+A Kibana-styled analyst console reads the same JSONL evidence and exec_log
+reports, surfaces severity timeseries, MITRE ATT&CK technique coverage, top
+mutated paths, scenario step traces, and a live WebSocket-backed event stream.
+
+```bash
+# 1. install dashboard deps (FastAPI + uvicorn already in requirements.txt)
+pip install -r requirements.txt
+
+# 2. (optional) seed believable evidence so the dashboard has data without
+#    needing the full Docker observer stack online
+python -m dashboard.seed_demo --reset
+
+# 3. launch the console
+python -m dashboard.server          # http://127.0.0.1:8088
+
+# 4. (optional, in a second terminal) keep the live stream flowing during a
+#    presentation by appending synthetic events at ~2 events/sec
+python -m dashboard.live_demo --eps 2
+```
+
+Endpoints:
+
+- `GET /` — analyst console (single-page app)
+- `GET /api/stats` — aggregated metrics over buffered evidence
+- `GET /api/runs` — every `reports/*_exec_log.json` run summary
+- `GET /api/events?limit=N` — last-N buffered NormalizedEvents
+- `GET /api/attack-map` — MITRE ATT&CK technique mapping per behavior
+- `WS /ws` — live event push (snapshot on connect, then per-event frames)
+
+The server is read-only — it never mutates evidence or fires scenarios.
+
+---
+
 ## Local Setup
 
 ```bash
