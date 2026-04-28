@@ -454,8 +454,93 @@ function renderRunDetail() {
         <div class="coverage-list">${gapsHtml}</div>
       </div>
     </div>
+
+    <div class="brief-toolbar">
+      <div class="brief-toolbar-left">
+        <span class="panel-sub">AI INTELLIGENCE</span>
+        <select id="brief-model" class="brief-model">
+          <option value="">gemini-3-pro-preview (default)</option>
+          <option value="gemini-3-pro-preview">gemini-3-pro-preview</option>
+          <option value="gemini-pro-latest">gemini-pro-latest</option>
+          <option value="gemini-2.5-pro">gemini-2.5-pro</option>
+          <option value="gemini-2.5-flash">gemini-2.5-flash</option>
+          <option value="gemini-flash-latest">gemini-flash-latest</option>
+        </select>
+      </div>
+      <div class="brief-toolbar-right">
+        <button id="brief-generate" class="btn btn-primary">GENERATE BRIEF</button>
+        <button id="brief-regenerate" class="btn">REGEN</button>
+      </div>
+    </div>
+    <div id="brief-panel" class="brief-panel"></div>
+
     <div class="panel-sub" style="font-size:10px;letter-spacing:0.18em;color:var(--text-mute);margin:12px 0 6px 0">EXECUTION STEPS</div>
     <div class="step-list">${steps || '<div class="empty-hint">no steps recorded</div>'}</div>`;
+
+  document.getElementById("brief-generate").addEventListener("click", () => fetchBrief(run.run_id, false));
+  document.getElementById("brief-regenerate").addEventListener("click", () => fetchBrief(run.run_id, true));
+  // auto-load any cached brief
+  loadCachedBrief(run.run_id);
+}
+
+async function loadCachedBrief(runId) {
+  try {
+    const r = await fetch(`/api/runs/${encodeURIComponent(runId)}/brief`);
+    if (r.ok) {
+      const data = await r.json();
+      renderBrief(data, true);
+    }
+  } catch (_) {
+    /* no cache; expected */
+  }
+}
+
+async function fetchBrief(runId, regenerate) {
+  const panel = document.getElementById("brief-panel");
+  if (!panel) return;
+  const sel = document.getElementById("brief-model");
+  const model = sel ? sel.value : "";
+  panel.innerHTML = `<div class="brief-loading">
+    <span class="spinner"></span>
+    <span>Querying ${escapeHtml(model || "gemini-3-pro-preview")} … building incident brief from ${(STATE.events || []).length} events</span>
+  </div>`;
+  try {
+    const params = new URLSearchParams();
+    if (model) params.set("model", model);
+    if (regenerate) params.set("regenerate", "true");
+    const url = `/api/runs/${encodeURIComponent(runId)}/brief${params.toString() ? "?" + params.toString() : ""}`;
+    const r = await fetch(url, { method: "POST" });
+    const data = await r.json();
+    if (!r.ok) {
+      panel.innerHTML = `<div class="brief-error">⚠ ${escapeHtml(data.detail || r.statusText)}</div>`;
+      return;
+    }
+    renderBrief(data, false);
+  } catch (e) {
+    panel.innerHTML = `<div class="brief-error">⚠ ${escapeHtml(e.message || String(e))}</div>`;
+  }
+}
+
+function renderBrief(data, fromCache) {
+  const panel = document.getElementById("brief-panel");
+  if (!panel) return;
+  const md = data.brief_markdown || "";
+  let html = "";
+  try {
+    html = window.DOMPurify.sanitize(window.marked.parse(md));
+  } catch (e) {
+    html = `<pre>${escapeHtml(md)}</pre>`;
+  }
+  const meta = [
+    `<span class="meta-key">model</span> ${escapeHtml(data.model || "?")}`,
+    `<span class="meta-key">generated</span> ${escapeHtml((data.generated_at || "").substring(0, 19).replace("T", " "))}`,
+    data.prompt_tokens != null ? `<span class="meta-key">prompt_tok</span> ${data.prompt_tokens}` : "",
+    data.completion_tokens != null ? `<span class="meta-key">resp_tok</span> ${data.completion_tokens}` : "",
+    fromCache ? `<span class="meta-key cached">cached</span>` : `<span class="meta-key fresh">live</span>`,
+  ].filter(Boolean).join("  ·  ");
+  panel.innerHTML = `
+    <div class="brief-meta">${meta}</div>
+    <div class="brief-markdown">${html}</div>`;
 }
 
 function renderEventStream() {

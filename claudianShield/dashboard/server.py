@@ -24,7 +24,7 @@ from collections import defaultdict, deque
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -316,6 +316,76 @@ def build_app(evidence_dir: Path, reports_dir: Path) -> FastAPI:
     @app.get("/api/attack-map")
     async def attack_map() -> JSONResponse:
         return JSONResponse(ATTACK_MAP)
+
+    def _resolve_run(run_id: str) -> dict[str, Any]:
+        for r in _load_runs(reports_dir):
+            if r.get("run_id") == run_id:
+                return r
+        raise HTTPException(status_code=404, detail=f"run not found: {run_id}")
+
+    def _events_for_run(run_id: str) -> list[dict[str, Any]]:
+        return [e for e in tailer.snapshot() if e.get("run_id") == run_id]
+
+    def _techniques_for_run(run: dict[str, Any]) -> list[dict[str, str]]:
+        out: list[dict[str, str]] = []
+        for b in run.get("behaviors_planned", []):
+            for t in ATTACK_MAP.get(b, []):
+                rec = {**t, "behavior": b}
+                if rec not in out:
+                    out.append(rec)
+        return out
+
+    def _brief_cache_path(run_id: str) -> Path:
+        return reports_dir / f"{run_id}_brief.json"
+
+    @app.get("/api/runs/{run_id}/brief")
+    async def get_brief(run_id: str) -> JSONResponse:
+        cache = _brief_cache_path(run_id)
+        if not cache.exists():
+            raise HTTPException(status_code=404, detail="no cached brief; POST to generate")
+        return JSONResponse(json.loads(cache.read_text(encoding="utf-8")))
+
+    @app.post("/api/runs/{run_id}/brief")
+    async def generate_brief(
+        run_id: str,
+        model: str | None = None,
+        regenerate: bool = False,
+    ) -> JSONResponse:
+        cache = _brief_cache_path(run_id)
+        if cache.exists() and not regenerate:
+            payload = json.loads(cache.read_text(encoding="utf-8"))
+            payload["from_cache"] = True
+            return JSONResponse(payload)
+
+        run = _resolve_run(run_id)
+        events = _events_for_run(run_id)
+        if not events:
+            # fall back to whole buffer if the run's events are no longer in
+            # the rolling window (post-restart) — better than empty context
+            events = tailer.snapshot()
+        attack = _techniques_for_run(run)
+
+        try:
+            from intelligence.gemini_client import (
+                GeminiNotConfigured,
+                generate_brief as _gen,
+            )
+        except ImportError as exc:  # SDK not installed
+            raise HTTPException(
+                status_code=500,
+                detail=f"google-generativeai not installed: {exc}",
+            )
+
+        try:
+            payload = await asyncio.to_thread(_gen, run, events, attack, model)
+        except GeminiNotConfigured as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        except Exception as exc:  # noqa: BLE001 — surface SDK errors to the UI
+            raise HTTPException(status_code=502, detail=f"gemini call failed: {exc}")
+
+        cache.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        payload["from_cache"] = False
+        return JSONResponse(payload)
 
     @app.websocket("/ws")
     async def ws(websocket: WebSocket) -> None:
