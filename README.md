@@ -178,6 +178,8 @@ A Kibana-styled analyst console reads the same JSONL evidence and exec_log
 reports, surfaces severity timeseries, MITRE ATT&CK technique coverage, top
 mutated paths, scenario step traces, and a live WebSocket-backed event stream.
 
+![ClawdianShield SOC Console - Overview showing 138 ingested events, severity timeseries, event type distribution, collector feeds, and top mutated paths](claudianShield/docs/dashboard-screenshot.png)
+
 ```bash
 # 1. install dashboard deps (FastAPI + uvicorn already in requirements.txt)
 pip install -r requirements.txt
