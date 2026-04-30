@@ -4,7 +4,26 @@
 
 > [!IMPORTANT]
 > **Status: Phase 3a (Telemetry Observer) is LIVE.**
-> End-to-end verified: `fim_burst_tamper.json` produced 6 authentic file events; `synthetic_auth_abuse.json` produced 6 auth events. This project demonstrates real-world telemetry collection, not just slide-deck theory.
+> This project demonstrates real-world telemetry collection, not just slide-deck theory. End-to-end verified scenarios actively stream signals from host-side observers.
+
+**Proof of Execution (Authentic Host Telemetry)**  
+When `fim_burst_tamper.json` fires, the execution plane induces state changes, and the host-side observer instantly streams the evidence:
+
+```json
+{
+  "run_id": "live-fire-001",
+  "scenario_id": "fim_burst_001",
+  "host": "workstation-1",
+  "event_type": "file_create",
+  "timestamp": "2026-04-29T01:01:52.906Z",
+  "severity": "medium",
+  "details": {
+    "path": "victim_state/sensitive.conf",
+    "sha256": "b7bce5de2b533fd8ad8ea39be699ae4b39bbaaada16e2dd029848c745d0ab816"
+  },
+  "collector": "file_observer"
+}
+```
 
 ---
 
