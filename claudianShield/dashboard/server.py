@@ -366,14 +366,14 @@ def build_app(evidence_dir: Path, reports_dir: Path) -> FastAPI:
         attack = _techniques_for_run(run)
 
         try:
-            from intelligence.gemini_client import (
+            from claudianShield.intelligence.gemini_client import (
                 GeminiNotConfigured,
                 generate_brief as _gen,
             )
         except ImportError as exc:  # SDK not installed
             raise HTTPException(
                 status_code=500,
-                detail=f"google-generativeai not installed: {exc}",
+                detail=f"google-genai SDK not installed: {exc}",
             )
 
         try:
