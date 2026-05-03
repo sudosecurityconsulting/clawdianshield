@@ -32,6 +32,12 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - PYTHONUNBUFFERED=1
+      # Inside Docker, Splunk is reachable via its service name.
+      # Host-side collectors use http://localhost:8088 instead.
+      - SPLUNK_HEC_URL=http://splunk:8088
+      - SPLUNK_HEC_TOKEN=${SPLUNK_HEC_TOKEN}
+    networks:
+      - clawdian_net
     # Default: dry-run the storyline. Override via:
     #   docker compose run --rm clawdianshield-runner \
     #     python runner/executor.py scenarios/<id>.json --container clawdian_victim
@@ -42,3 +48,42 @@ services:
         "scenarios/full_storyline.json",
         "--dry-run",
       ]
+
+  splunk:
+    image: splunk/splunk:latest
+    container_name: clawdian_splunk
+    environment:
+      - SPLUNK_START_ARGS=--accept-license
+      # Must be set in .env — min 8 chars, at least one uppercase + number.
+      - SPLUNK_PASSWORD=${SPLUNK_PASSWORD}
+      # Auto-provisions this token and enables the HEC input on startup.
+      - SPLUNK_HEC_TOKEN=${SPLUNK_HEC_TOKEN}
+      # Disable TLS on the HEC port so http:// URLs work without cert pinning.
+      - SPLUNK_HEC_SSL=false
+    ports:
+      - "8000:8000"   # Splunk Web UI
+      - "8088:8088"   # HTTP Event Collector ingest
+    volumes:
+      # Both mounts are required to persist the HEC token across restarts.
+      # Without them, Splunk regenerates its config on every container start,
+      # invalidating the token stored in .env.
+      - splunk_var:/opt/splunk/var
+      - splunk_etc:/opt/splunk/etc
+    networks:
+      - clawdian_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      # Splunk takes 60-120s to initialise on first boot; give it room.
+      start_period: 90s
+    restart: "no"
+
+networks:
+  clawdian_net:
+    driver: bridge
+
+volumes:
+  splunk_var:
+  splunk_etc:

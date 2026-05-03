@@ -5,11 +5,12 @@ Gemini-backed incident brief generator. Takes a run's exec_log, the events
 the observers captured during it, and the MITRE ATT&CK techniques the
 scenario exercises, then asks Gemini to produce a SOC-grade markdown brief.
 
-The model defaults to gemini-3.1-pro (overridable via the GEMINI_MODEL env
+The model defaults to gemini-2.5-flash (overridable via the GEMINI_MODEL env
 var or per-request argument). Briefs are written to
-reports/<run_id>_brief.md so re-clicks don't re-bill.
+reports/<run_id>_brief.json so re-clicks don't re-bill.
 
 Reads GEMINI_API_KEY (or GOOGLE_API_KEY as fallback) from claudianShield/.env.
+Uses the google-genai SDK (google.genai), not the deprecated google-generativeai.
 """
 from __future__ import annotations
 
@@ -29,7 +30,7 @@ except Exception:
     pass
 
 
-DEFAULT_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3-pro-preview")
+DEFAULT_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
 MAX_EVENTS_IN_PROMPT = 30
 MAX_STEPS_IN_PROMPT = 25
 
@@ -177,16 +178,17 @@ def generate_brief(
     model: str | None = None,
 ) -> dict[str, Any]:
     """Synchronously call Gemini and return the brief payload."""
-    import google.generativeai as genai
+    from google import genai
+    from google.genai import types
 
-    genai.configure(api_key=_api_key())
+    client = genai.Client(api_key=_api_key())
     model_name = model or DEFAULT_MODEL
     prompt = build_prompt(run, events, attack)
 
-    gm = genai.GenerativeModel(model_name)
-    response = gm.generate_content(
-        prompt,
-        generation_config=genai.types.GenerationConfig(
+    response = client.models.generate_content(
+        model=model_name,
+        contents=prompt,
+        config=types.GenerateContentConfig(
             temperature=0.3,
             max_output_tokens=4096,
         ),
@@ -199,8 +201,8 @@ def generate_brief(
     candidates = getattr(response, "candidates", None) or []
     if candidates:
         cand = candidates[0]
-        fr = int(getattr(cand, "finish_reason", 0) or 0)
-        finish_reason = _FINISH_REASONS.get(fr, str(fr))
+        fr = getattr(cand, "finish_reason", None)
+        finish_reason = str(fr.name) if hasattr(fr, "name") else _FINISH_REASONS.get(int(fr or 0), str(fr))
         for part in getattr(cand.content, "parts", []) or []:
             t = getattr(part, "text", None)
             if t:

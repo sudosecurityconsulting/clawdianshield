@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8" />
@@ -43,7 +43,7 @@
       <div class="kpi"><div class="kpi-label">SCENARIO RUNS</div><div class="kpi-value" id="kpi-runs">0</div><div class="kpi-foot">recorded executions</div></div>
     </div>
 
-    <div class="grid-2x2">
+    <div class="grid-2c">
       <div class="panel">
         <div class="panel-head"><span>EVENT VOLUME OVER TIME</span><span class="panel-sub">stacked by severity · per minute</span></div>
         <div class="panel-body"><canvas id="chart-timeseries"></canvas></div>
@@ -52,17 +52,22 @@
         <div class="panel-head"><span>EVENT TYPES</span><span class="panel-sub">distribution</span></div>
         <div class="panel-body"><canvas id="chart-types"></canvas></div>
       </div>
-      <div class="panel">
-        <div class="panel-head"><span>SEVERITY MIX</span><span class="panel-sub">all collectors</span></div>
-        <div class="panel-body"><canvas id="chart-severity"></canvas></div>
+    </div>
+
+        <!-- UNIFIED KILL CHAIN — 3-zone reactive tracker -->
+    <div class="panel ukc-panel">
+      <div class="panel-head"><span>UNIFIED KILL CHAIN</span><span class="panel-sub">reactive threat progression &middot; IN &rarr; THROUGH &rarr; OUT</span></div>
+      <div class="panel-body ukc-body">
+        <div class="ukc-zones" id="ukc-zones"></div>
+        <div class="ukc-summary" id="ukc-summary"></div>
       </div>
+    </div>
+
+    <div class="grid-3c">
       <div class="panel">
         <div class="panel-head"><span>COLLECTOR FEEDS</span><span class="panel-sub">events per sensor</span></div>
         <div class="panel-body"><canvas id="chart-collectors"></canvas></div>
       </div>
-    </div>
-
-    <div class="grid-2c">
       <div class="panel">
         <div class="panel-head"><span>TOP MUTATED PATHS</span><span class="panel-sub">file_observer</span></div>
         <table class="data-table" id="tbl-paths">

@@ -107,7 +107,7 @@ async function refreshStats() {
   renderKPIs();
   renderTimeseries();
   renderTypes();
-  renderSeverity();
+  renderKillChain();
   renderCollectors();
   renderTopTables();
   renderActiveRun();
@@ -212,16 +212,7 @@ function initCharts() {
     },
   });
 
-  charts.severity = new Chart(document.getElementById("chart-severity"), {
-    type: "doughnut",
-    data: { labels: [], datasets: [] },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      cutout: "62%",
-      plugins: { legend: { position: "right", labels: { boxWidth: 10 } } },
-    },
-  });
+  // Kill chain uses custom canvas rendering, no Chart.js instance needed
 
   charts.collectors = new Chart(document.getElementById("chart-collectors"), {
     type: "bar",
@@ -246,7 +237,7 @@ function renderAll() {
   renderKPIs();
   renderTimeseries();
   renderTypes();
-  renderSeverity();
+  renderKillChain();
   renderCollectors();
   renderTopTables();
   renderActiveRun();
@@ -295,18 +286,256 @@ function renderTypes() {
   charts.types.update();
 }
 
-function renderSeverity() {
-  const by = (STATE.stats && STATE.stats.by_severity) || {};
-  const labels = SEVERITY_ORDER.filter((s) => by[s]);
-  const data = labels.map((s) => by[s]);
-  charts.severity.data.labels = labels;
-  charts.severity.data.datasets = [{
-    data,
-    backgroundColor: labels.map((s) => SEVERITY_COLOR[s]),
-    borderColor: "#0b0e13",
-    borderWidth: 2,
-  }];
-  charts.severity.update();
+// ============ UNIFIED KILL CHAIN — Pols (2017) 18-Tactic 3-Phase Model ============
+// Visual: Stellar Cyber style — solid base ring, active tactic arcs glow on top
+// Neon palette: IN=#00ff9f  THROUGH=#00bfff  OUT=#ff2d55
+
+const UKC_ZONES = [
+  {
+    id: "in", label: "IN", subtitle: "Initial Foothold", color: "#00ff9f",
+    ring: [
+      { id: "reconn",   label: "Reconnaissance",  tactic: "TA0043", behaviors: [] },
+      { id: "resdev",   label: "Resource Dev",     tactic: "TA0042", behaviors: [] },
+      { id: "delivery", label: "Delivery",         tactic: "TA0001", behaviors: ["auth_anomalies"] },
+      { id: "social",   label: "Social Eng",       tactic: "TA0001", behaviors: ["auth_anomalies"] },
+      { id: "exploit",  label: "Exploitation",     tactic: "TA0002", behaviors: ["remote_execution_artifacts"] },
+      { id: "persist",  label: "Persistence",      tactic: "TA0003", behaviors: ["persistence_path_changes"] },
+      { id: "defev",    label: "Defense Evasion",  tactic: "TA0005", behaviors: ["anti_forensics"] },
+      { id: "c2in",     label: "C2",               tactic: "TA0011", behaviors: [] },
+    ],
+    flow: ["Reconnaissance", "Resource Dev", "C2"],
+  },
+  {
+    id: "through", label: "THROUGH", subtitle: "Network Propagation", color: "#00bfff",
+    ring: [
+      { id: "pivot",   label: "Pivoting",          tactic: "TA0008", behaviors: [] },
+      { id: "disc",    label: "Discovery",         tactic: "TA0007", behaviors: [] },
+      { id: "privesc", label: "Priv Escalation",   tactic: "TA0004", behaviors: [] },
+      { id: "exec",    label: "Execution",         tactic: "TA0002", behaviors: ["remote_execution_artifacts"] },
+      { id: "credacc", label: "Cred Access",       tactic: "TA0006", behaviors: ["auth_anomalies"] },
+      { id: "latmov",  label: "Lateral Movement",  tactic: "TA0008", behaviors: [] },
+    ],
+    flow: ["Pivoting", "Discovery", "Lateral Movement"],
+  },
+  {
+    id: "out", label: "OUT", subtitle: "Actions on Objectives", color: "#ff2d55",
+    ring: [
+      { id: "collect", label: "Collection",        tactic: "TA0009", behaviors: ["file_tamper", "staging"] },
+      { id: "exfil",   label: "Exfiltration",      tactic: "TA0010", behaviors: ["staging", "cleanup"] },
+      { id: "impact",  label: "Impact",            tactic: "TA0040", behaviors: ["file_tamper", "anti_forensics"] },
+      { id: "obj",     label: "Objectives",        tactic: "TA0040", behaviors: ["file_tamper"] },
+    ],
+    flow: ["Collection", "Objectives"],
+  },
+];
+
+function renderKillChain() {
+  const container = document.getElementById("ukc-zones");
+  const summaryEl = document.getElementById("ukc-summary");
+  if (!container) return;
+
+  const stats = STATE.stats || {};
+  const techniques = stats.attack_techniques || [];
+
+  let totalActive = 0, totalTactics = 0, totalTechniques = 0;
+  const zoneCounts = {};
+
+  const scoredZones = UKC_ZONES.map((zone) => {
+    zoneCounts[zone.id] = 0;
+    const ring = zone.ring.map((tactic) => {
+      const matched = [];
+      tactic.behaviors.forEach((b) => {
+        techniques.filter((t) => t.behavior === b).forEach((t) => matched.push(t));
+      });
+      const active = matched.length > 0;
+      if (active) { zoneCounts[zone.id]++; totalActive++; }
+      totalTactics++;
+      totalTechniques += matched.length;
+      return { ...tactic, count: matched.length, techniques: matched, active };
+    });
+    return { zone, ring };
+  });
+
+  // -----------------------------------------------------------------------
+  // Geometry — stroke-arc method (matches Stellar Cyber ring style)
+  // Rm = ring mid-radius (stroke center), band = stroke-width
+  // The full ring is a stroked circle; active arcs are drawn on top
+  // -----------------------------------------------------------------------
+  const VW = 820, VH = 315;
+  const Rm = 92;          // mid-radius of the ring band
+  const band = 40;        // ring band thickness (stroke-width)
+  const Ro = Rm + band/2; // outer edge = 112
+  const Ri = Rm - band/2; // inner edge = 72
+  const ri = Ri - 8;      // inner center circle radius = 64
+  const CY = 147;
+  const centers = [{ x: 148, id: "in" }, { x: 408, id: "through" }, { x: 668, id: "out" }];
+  const GAP = 2.5;        // degrees gap between segments
+  const LABEL_R = Ro + 16; // radius of tactic labels
+
+  function pt(cx, r, deg) {
+    const a = (deg - 90) * Math.PI / 180;
+    return [cx + r * Math.cos(a), CY + r * Math.sin(a)];
+  }
+  const f = (n) => n.toFixed(2);
+
+  // Arc path for stroke-based ring segment
+  function arcD(cx, r, a1, a2) {
+    const [sx, sy] = pt(cx, r, a1);
+    const [ex, ey] = pt(cx, r, a2);
+    const large = (a2 - a1) > 180 ? 1 : 0;
+    // avoid degenerate full-circle arc (SVG ignores start==end)
+    return `M ${f(sx)} ${f(sy)} A ${r} ${r} 0 ${large} 1 ${f(ex)} ${f(ey)}`;
+  }
+
+  let svgDefs = "", svgBridges = "", svgContent = "";
+
+  scoredZones.forEach(({ zone, ring }, zi) => {
+    const cx = centers[zi].x;
+    const col = zone.color;
+    const n = ring.length;
+    const segDeg = 360 / n;
+    const zoneActive = zoneCounts[zone.id] > 0;
+
+    // Glow filters
+    svgDefs += `
+      <filter id="glow-${zone.id}" x="-60%" y="-60%" width="220%" height="220%">
+        <feGaussianBlur stdDeviation="7" result="b"/>
+        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+      <filter id="glowsm-${zone.id}" x="-30%" y="-30%" width="160%" height="160%">
+        <feGaussianBlur stdDeviation="3.5" result="b"/>
+        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>`;
+
+    // ── 1. Base ring — always visible dim outline of the full loop ──
+    svgContent += `<circle cx="${cx}" cy="${CY}" r="${Rm}"
+      fill="none" stroke="${col}" stroke-width="${band}"
+      opacity="${zoneActive ? 0.14 : 0.10}"/>`;
+
+    // ── 2. Per-segment: active arc + tick dividers + labels ──
+    ring.forEach((tactic, i) => {
+      const a1 = i * segDeg + GAP;
+      const a2 = (i + 1) * segDeg - GAP;
+      const aMid = (a1 + a2) / 2;
+
+      // Active arc drawn as thick stroke on top of base ring
+      if (tactic.active) {
+        svgContent += `<path d="${arcD(cx, Rm, a1, a2)}"
+          fill="none" stroke="${col}" stroke-width="${band}"
+          stroke-linecap="butt" opacity="0.92"
+          filter="url(#glowsm-${zone.id})"/>`;
+      }
+
+      // Thin dark tick at segment boundary (gives chevron-like divisions)
+      const [tx1, ty1] = pt(cx, Ri + 1, i * segDeg);
+      const [tx2, ty2] = pt(cx, Ro - 1, i * segDeg);
+      svgContent += `<line x1="${f(tx1)}" y1="${f(ty1)}" x2="${f(tx2)}" y2="${f(ty2)}"
+        stroke="#0a0d11" stroke-width="2" opacity="0.85"/>`;
+
+      // Tactic label outside the ring
+      const [lx, ly] = pt(cx, LABEL_R, aMid);
+      // Rotate so text runs tangentially (clockwise) — flip bottom half
+      const rot = aMid <= 180 ? aMid - 90 : aMid + 90;
+      svgContent += `<text x="${f(lx)}" y="${f(ly)}"
+        text-anchor="middle" dominant-baseline="central"
+        transform="rotate(${f(rot)},${f(lx)},${f(ly)})"
+        font-family="monospace" font-size="6.8" font-weight="${tactic.active ? 700 : 400}"
+        fill="${col}" opacity="${tactic.active ? 1 : 0.42}"
+        letter-spacing="0.06em">${tactic.label.toUpperCase()}</text>`;
+    });
+
+    // ── 3. Inner center circle ──
+    svgContent += `<circle cx="${cx}" cy="${CY}" r="${ri}"
+      fill="${zoneActive ? col : "#0b0f15"}" stroke="${col}"
+      stroke-width="${zoneActive ? 2 : 0.8}"
+      opacity="${zoneActive ? 0.94 : 0.35}"
+      ${zoneActive ? `filter="url(#glow-${zone.id})"` : ""}/>`;
+
+    // Zone label in center
+    const tc = zoneActive ? "#060809" : col;
+    const fz = zone.id === "through" ? 11 : 14;
+    svgContent += `<text x="${cx}" y="${CY - 8}" text-anchor="middle"
+      font-family="monospace" font-size="${fz}" font-weight="900"
+      fill="${tc}" letter-spacing="0.1em">${zone.label}</text>`;
+    svgContent += `<text x="${cx}" y="${CY + 7}" text-anchor="middle"
+      font-family="monospace" font-size="4.8" font-weight="600"
+      fill="${tc}" opacity="0.72" letter-spacing="0.14em">${zone.subtitle.toUpperCase()}</text>`;
+    if (zoneActive) {
+      svgContent += `<text x="${cx}" y="${CY + 19}" text-anchor="middle"
+        font-family="monospace" font-size="5" font-weight="700"
+        fill="${tc}" opacity="0.65">${zoneCounts[zone.id]}/${ring.length} ACTIVE</text>`;
+    }
+  });
+
+  // ── Bridge connectors — bezier tubes along ring bottoms ──
+  // Drawn into svgBridges so rings render ON TOP and naturally cap the tube endpoints.
+  // BY = ring-band center at the bottom; control points dip below so the tube
+  // emerges visibly beneath each ring's outer edge (CY + Ro ≈ 259).
+  [[0,1],[1,2]].forEach(([a, b]) => {
+    const cx_a = centers[a].x, cx_b = centers[b].x;
+    const c1 = UKC_ZONES[a].color, c2 = UKC_ZONES[b].color;
+    const gid = `brg${a}${b}`;
+    const BY = CY + Rm;                       // 239 — ring-band centre at bottom
+    const droop = 42;                         // curve dips this many px below BY
+    const cp = (cx_b - cx_a) * 0.34;         // bezier control-point x offset
+    const bh = 10;                            // tube half-height
+
+    svgDefs += `<linearGradient id="${gid}" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="${c1}" stop-opacity="0.72"/>
+      <stop offset="100%" stop-color="${c2}" stop-opacity="0.72"/>
+    </linearGradient>`;
+
+    // Centre spine of the tube (cubic bezier)
+    // Horizontal tangent at both ends matches the ring's tangent at its bottom-most point.
+    const spineTop  = `M ${f(cx_a)} ${f(BY-bh)} C ${f(cx_a+cp)} ${f(BY-bh+droop)}, ${f(cx_b-cp)} ${f(BY-bh+droop)}, ${f(cx_b)} ${f(BY-bh)}`;
+    const spineBot  = `C ${f(cx_b-cp)} ${f(BY+bh+droop)}, ${f(cx_a+cp)} ${f(BY+bh+droop)}, ${f(cx_a)} ${f(BY+bh)}`;
+    svgBridges += `<path d="${spineTop} L ${f(cx_b)} ${f(BY+bh)} ${spineBot} Z"
+      fill="url(#${gid})" opacity="0.62"/>`;
+
+    // Chevron arrow at the lowest midpoint of the droop (t=0.5 → y = BY + droop*0.75)
+    const mx  = (cx_a + cx_b) / 2;
+    const mY  = BY + droop * 0.75;
+    svgBridges += `<polygon points="${f(mx+9)},${f(mY)} ${f(mx-3)},${f(mY-6)} ${f(mx-3)},${f(mY+6)}"
+      fill="url(#${gid})" opacity="0.95"/>`;
+  });
+
+  const svgHTML = `<svg class="ukc-loops-svg" viewBox="0 0 ${VW} ${VH}" preserveAspectRatio="xMidYMid meet">
+    <defs>${svgDefs}</defs>${svgBridges}${svgContent}</svg>`;
+
+  // ── Bottom chevron flow bar ──
+  const allFlow = scoredZones.flatMap(({ zone }) =>
+    zone.flow.map((label) => ({ label, color: zone.color, id: zone.id }))
+  );
+  const flowHTML = allFlow.map((item, i) => {
+    const isLast = i === allFlow.length - 1;
+    const prevZone = i > 0 ? allFlow[i-1].id : null;
+    const bc = prevZone && prevZone !== item.id ? " ukc-flow-zone-break" : "";
+    return `<div class="ukc-flow-item${bc}" style="--fc:${item.color}" data-cycle="${item.id}">
+      <span class="ukc-flow-label">${item.label}</span>
+      ${!isLast ? `<span class="ukc-flow-arrow">&#x276F;</span>` : ""}
+    </div>`;
+  }).join("");
+
+  container.innerHTML = `<div class="ukc-diagram">
+    <div class="ukc-loops">${svgHTML}</div>
+    <div class="ukc-flow-bar">${flowHTML}</div>
+  </div>`;
+
+  if (summaryEl) {
+    const pct = Math.round((totalActive / totalTactics) * 100);
+    summaryEl.innerHTML =
+      `<span class="ukc-stat"><b>${totalTechniques}</b> techniques</span>` +
+      `<span class="ukc-sep">&middot;</span>` +
+      `<span class="ukc-stat"><b>${totalActive}</b>/${totalTactics} tactics active</span>` +
+      `<span class="ukc-sep">&middot;</span>` +
+      `<span class="ukc-stat"><b>${pct}%</b> UKC coverage</span>` +
+      `<span class="ukc-sep">|</span>` +
+      `<span class="ukc-stat zone-in"><b>${zoneCounts.in||0}/8</b> IN</span>` +
+      `<span class="ukc-stat zone-through"><b>${zoneCounts.through||0}/6</b> THROUGH</span>` +
+      `<span class="ukc-stat zone-out"><b>${zoneCounts.out||0}/4</b> OUT</span>` +
+      `<span class="ukc-sep">&middot;</span>` +
+      `<span class="ukc-stat" style="opacity:0.38;font-size:9px">Pols (2017) §§3.2-3.4</span>`;
+  }
 }
 
 function renderCollectors() {
@@ -459,12 +688,12 @@ function renderRunDetail() {
       <div class="brief-toolbar-left">
         <span class="panel-sub">AI INTELLIGENCE</span>
         <select id="brief-model" class="brief-model">
-          <option value="">gemini-3-pro-preview (default)</option>
-          <option value="gemini-3-pro-preview">gemini-3-pro-preview</option>
-          <option value="gemini-pro-latest">gemini-pro-latest</option>
-          <option value="gemini-2.5-pro">gemini-2.5-pro</option>
+          <option value="">gemini-2.5-flash (default)</option>
           <option value="gemini-2.5-flash">gemini-2.5-flash</option>
-          <option value="gemini-flash-latest">gemini-flash-latest</option>
+          <option value="gemini-2.5-pro">gemini-2.5-pro</option>
+          <option value="gemini-2.0-flash">gemini-2.0-flash</option>
+          <option value="gemini-1.5-pro">gemini-1.5-pro</option>
+          <option value="gemini-1.5-flash">gemini-1.5-flash</option>
         </select>
       </div>
       <div class="brief-toolbar-right">
@@ -502,7 +731,7 @@ async function fetchBrief(runId, regenerate) {
   const model = sel ? sel.value : "";
   panel.innerHTML = `<div class="brief-loading">
     <span class="spinner"></span>
-    <span>Querying ${escapeHtml(model || "gemini-3-pro-preview")} … building incident brief from ${(STATE.events || []).length} events</span>
+    <span>Querying ${escapeHtml(model || "gemini-2.5-flash")} … building incident brief from ${(STATE.events || []).length} events</span>
   </div>`;
   try {
     const params = new URLSearchParams();

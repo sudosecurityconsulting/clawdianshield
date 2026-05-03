@@ -12,6 +12,9 @@ rich>=13.0.0
 fastapi>=0.110.0
 uvicorn[standard]>=0.27.0
 
+# Phase 3 telemetry — HEC forwarder (telemetry/forwarders/splunk_hec.py)
+requests>=2.32.0
+
 # AI intelligence plane (intelligence/gemini_client.py)
-google-generativeai>=0.8.0
+google-genai>=1.0.0
 python-dotenv>=1.0.0
