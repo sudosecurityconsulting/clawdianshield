@@ -193,6 +193,16 @@ def _load_runs(reports_dir: Path) -> list[dict[str, Any]]:
             data = json.loads(p.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
             continue
+            
+        score_path = p.with_name(p.name.replace("_exec_log.json", "_score.json"))
+        if score_path.exists():
+            try:
+                data["score"] = json.loads(score_path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                data["score"] = None
+        else:
+            data["score"] = None
+            
         runs.append(data)
     return runs
 
@@ -366,7 +376,7 @@ def build_app(evidence_dir: Path, reports_dir: Path) -> FastAPI:
         attack = _techniques_for_run(run)
 
         try:
-            from claudianShield.intelligence.gemini_client import (
+            from intelligence.gemini_client import (
                 GeminiNotConfigured,
                 generate_brief as _gen,
             )

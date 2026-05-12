@@ -129,6 +129,8 @@ A Kibana-styled analyst console that reads the same JSONL evidence in real time.
 
 The Kill Chain visualization renders three phases — **IN** (Initial Foothold), **THROUGH** (Network Propagation), **OUT** (Actions on Objectives) — as glowing donut rings. Active tactic arcs light up as telemetry fires. If the whole ring is dim, your SOC has a problem.
 
+**Visual Playback:** The dashboard includes an animated, slow-motion playback feature for the Unified Kill Chain visualizer. Analysts can watch a cinematic, step-by-step trace of attack scenarios traversing the kill chain loops in real-time, illuminated by a rollercoaster-style glowing tracer.
+
 ![ClawdianShield Live Stream - Real-time WebSocket event feed showing live telemetry](docs/screenshot-live-stream.png)
 
 ```bash
@@ -297,7 +299,7 @@ All observers emit JSONL to `evidence/` using the `NormalizedEvent` schema (`sha
 | Phase | Description | Status |
 | :--- | :--- | :--- |
 | 1 — Core Engine | Scenario executor, Docker victim, safety gate, dry-run mode | ✅ Complete |
-| 2 — SOC Dashboard | FastAPI + WebSocket console, UKC visualization, ATT&CK map | ✅ Complete |
+| 2 — SOC Dashboard | FastAPI + WebSocket console, UKC visual playback, ATT&CK map | ✅ Complete |
 | 2b — AI Intelligence | Gemini brief generation, google-genai SDK, model selector | ✅ Complete |
 | 3a — Telemetry | Splunk HEC forwarder (`telemetry/`) | 📋 Backlog |
 | 3b — CVE Intelligence | NVD/CISA KEV feed → ATT&CK technique correlation | 📋 Backlog |

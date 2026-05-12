@@ -105,8 +105,7 @@ BEHAVIOR_STEPS: dict[str, list[tuple[str, str]]] = {
         ),
         (
             "artifact_exec",
-            "chmod +x /tmp/clawdianshield/exec_artifact.sh "
-            "&& /tmp/clawdianshield/exec_artifact.sh",
+            "sh /tmp/clawdianshield/exec_artifact.sh",
         ),
     ],
     "staging": [
