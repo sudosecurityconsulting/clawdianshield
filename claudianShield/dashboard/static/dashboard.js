@@ -287,135 +287,45 @@ function renderTypes() {
 }
 
 // ============ UNIFIED KILL CHAIN — Pols (2017) 18-Tactic 3-Phase Model ============
-
-const RC_PHASES = [
-  { id: "reconn",   label: "Reconnaissance",       len: 35,  zone: "in" },
-  { id: "resdev",   label: "Resource Development", len: 45,  zone: "in" },
-  { id: "delivery", label: "Delivery",             len: 40,  zone: "in" },
-  { id: "social",   label: "Social Engineering",   len: 55,  zone: "in" },
-  { id: "exploit",  label: "Exploitation",         len: 45,  zone: "in" },
-  { id: "persist",  label: "Persistence",          len: 45,  zone: "in" },
-  { id: "defev",    label: "Defense Evasion",      len: 50,  zone: "in" },
-  { id: "c2in",     label: "Command & Control",    len: 55,  zone: "in" },
-  { id: "pivot",    label: "Pivoting",             len: 50,  zone: "through" },
-  { id: "disc",     label: "Discovery",            len: 50,  zone: "through" },
-  { id: "privesc",  label: "Privilege Escalation", len: 55,  zone: "through" },
-  { id: "exec",     label: "Execution",            len: 45,  zone: "through" },
-  { id: "credacc",  label: "Credential Access",    len: 50,  zone: "through" },
-  { id: "latmov",   label: "Lateral Movement",     len: 55,  zone: "through" },
-  { id: "collect",  label: "Collection",           len: 55,  zone: "out" },
-  { id: "exfil",    label: "Exfiltration",         len: 110, zone: "out" },
-  { id: "impact",   label: "Impact",               len: 110, zone: "out" },
-  { id: "obj",      label: "Objectives",           len: 50,  zone: "out" }
-];
-
-const PATH_D = `M 20 270 L 100 270 C 170 270, 240 230, 240 140 A 90 90 0 1 0 60 140 C 60 230, 130 270, 210 270 L 360 270 C 430 270, 500 230, 500 140 A 90 90 0 1 0 320 140 C 320 230, 390 270, 470 270 L 620 270 C 690 270, 760 230, 760 140 A 90 90 0 1 0 580 140 C 580 230, 650 270, 730 270 L 800 270`;
-
-let pathLenComputed = false;
-let pathTotalLen = 1000;
-function precomputePath() {
-  if (pathLenComputed) return;
-  const tempPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
-  tempPath.setAttribute("d", PATH_D);
-  const svgTemp = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svgTemp.appendChild(tempPath);
-  document.body.appendChild(svgTemp);
-  pathTotalLen = tempPath.getTotalLength();
-  
-  let currentOffset = 0;
-  RC_PHASES.forEach(phase => {
-    phase.offset = currentOffset;
-    const midPct = (currentOffset + phase.len / 2) / 1000;
-    const pMid = tempPath.getPointAtLength(midPct * pathTotalLen);
-    const p1 = tempPath.getPointAtLength((Math.max(0, midPct - 0.005)) * pathTotalLen);
-    const p2 = tempPath.getPointAtLength((Math.min(1, midPct + 0.005)) * pathTotalLen);
-    
-    let angle = Math.atan2(p2.y - p1.y, p2.x - p1.x) * 180 / Math.PI;
-    if (angle > 90 || angle < -90) angle += 180;
-    
-    phase.pMid = pMid;
-    phase.angle = angle;
-    currentOffset += phase.len;
-  });
-  
-  document.body.removeChild(svgTemp);
-  pathLenComputed = true;
-}
-
-let replayAnim = null;
-let replayMode = false;
-let replayProgress = 0;
-
-function playUKCReplay() {
-  if (replayAnim) cancelAnimationFrame(replayAnim);
-  replayMode = true;
-  replayProgress = 0;
-  
-  const duration = 7500; // 7.5 seconds for slow motion playback
-  const start = performance.now();
-  
-  const frame = (now) => {
-    let t = (now - start) / duration;
-    if (t > 1) t = 1;
-    
-    // easeInOutQuad for dramatic slow motion effect
-    const ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
-    replayProgress = ease * 1000;
-    
-    renderKillChain();
-    
-    if (t < 1) {
-      replayAnim = requestAnimationFrame(frame);
-    } else {
-      setTimeout(() => {
-        replayMode = false;
-        renderKillChain();
-      }, 3000); // pause at the end for 3s
-    }
-  };
-  
-  replayAnim = requestAnimationFrame(frame);
-}
+// Visual: Stellar Cyber style — solid base ring, active tactic arcs glow on top
+// Neon palette: IN=#00ff9f  THROUGH=#00bfff  OUT=#ff2d55
 
 const UKC_ZONES = [
   {
-    id: "in", label: "IN", subtitle: "Initial Foothold", color: "#10b981",
+    id: "in", label: "IN", subtitle: "Initial Foothold", color: "#00ff9f",
     ring: [
-      { id: "social",   label: "Social Engineering", tactic: "TA0001" },
-      { id: "exploit",  label: "Exploitation",       tactic: "TA0002" },
-      { id: "persist",  label: "Persistence",        tactic: "TA0003" },
-      { id: "defev",    label: "Defense Evasion",    tactic: "TA0005" },
-      { id: "c2in",     label: "Command & Control",  tactic: "TA0011" },
+      { id: "reconn",   label: "Reconnaissance",  tactic: "TA0043", behaviors: [] },
+      { id: "resdev",   label: "Resource Dev",     tactic: "TA0042", behaviors: [] },
+      { id: "delivery", label: "Delivery",         tactic: "TA0001", behaviors: ["auth_anomalies"] },
+      { id: "social",   label: "Social Eng",       tactic: "TA0001", behaviors: ["auth_anomalies"] },
+      { id: "exploit",  label: "Exploitation",     tactic: "TA0002", behaviors: ["remote_execution_artifacts"] },
+      { id: "persist",  label: "Persistence",      tactic: "TA0003", behaviors: ["persistence_path_changes"] },
+      { id: "defev",    label: "Defense Evasion",  tactic: "TA0005", behaviors: ["anti_forensics"] },
+      { id: "c2in",     label: "C2",               tactic: "TA0011", behaviors: [] },
     ],
-    flow: [
-      { id: "reconn",   label: "Reconnaissance" },
-      { id: "resdev",   label: "Resource Development" },
-      { id: "delivery", label: "Delivery", isTransition: true },
-    ],
+    flow: ["Reconnaissance", "Resource Dev", "C2"],
   },
   {
-    id: "through", label: "THROUGH", subtitle: "Network Propagation", color: "#f59e0b",
+    id: "through", label: "THROUGH", subtitle: "Network Propagation", color: "#00bfff",
     ring: [
-      { id: "exec",    label: "Execution",           tactic: "TA0002" },
-      { id: "privesc", label: "Privilege Escalation",tactic: "TA0004" },
-      { id: "latmov",  label: "Lateral Movement",    tactic: "TA0008" },
-      { id: "credacc", label: "Credential Access",   tactic: "TA0006" },
+      { id: "pivot",   label: "Pivoting",          tactic: "TA0008", behaviors: [] },
+      { id: "disc",    label: "Discovery",         tactic: "TA0007", behaviors: [] },
+      { id: "privesc", label: "Priv Escalation",   tactic: "TA0004", behaviors: [] },
+      { id: "exec",    label: "Execution",         tactic: "TA0002", behaviors: ["remote_execution_artifacts"] },
+      { id: "credacc", label: "Cred Access",       tactic: "TA0006", behaviors: ["auth_anomalies"] },
+      { id: "latmov",  label: "Lateral Movement",  tactic: "TA0008", behaviors: [] },
     ],
-    flow: [
-      { id: "pivot",    label: "Pivoting", isTransition: true },
-      { id: "disc",     label: "Discovery" },
-    ],
+    flow: ["Pivoting", "Discovery", "Lateral Movement"],
   },
   {
-    id: "out", label: "OUT", subtitle: "Actions on Objectives", color: "#ef4444",
+    id: "out", label: "OUT", subtitle: "Actions on Objectives", color: "#ff2d55",
     ring: [
-      { id: "exfil",   label: "Exfiltration", tactic: "TA0010" },
-      { id: "impact",  label: "Impact",       tactic: "TA0040" },
+      { id: "collect", label: "Collection",        tactic: "TA0009", behaviors: ["file_tamper", "staging"] },
+      { id: "exfil",   label: "Exfiltration",      tactic: "TA0010", behaviors: ["staging", "cleanup"] },
+      { id: "impact",  label: "Impact",            tactic: "TA0040", behaviors: ["file_tamper", "anti_forensics"] },
+      { id: "obj",     label: "Objectives",        tactic: "TA0040", behaviors: ["file_tamper"] },
     ],
-    flow: [
-      { id: "collect",  label: "Collection" },
-      { id: "obj",      label: "Objectives" },
-    ],
+    flow: ["Collection", "Objectives"],
   },
 ];
 
@@ -424,117 +334,185 @@ function renderKillChain() {
   const summaryEl = document.getElementById("ukc-summary");
   if (!container) return;
 
-  const run = STATE.activeRun || {};
-  const score = run.score || {};
-  const ukcMapping = score.unified_kill_chain_mapping || {};
-  const activePhases = ukcMapping.ukc_phases_represented || [];
-  const behaviorsExecuted = ukcMapping.behaviors_executed || [];
+  const stats = STATE.stats || {};
+  const techniques = stats.attack_techniques || [];
 
-  precomputePath();
+  let totalActive = 0, totalTactics = 0, totalTechniques = 0;
+  const zoneCounts = {};
 
-  let totalActive = 0, totalTactics = 0;
-  const zoneCounts = { "in": 0, "through": 0, "out": 0 };
-
-  RC_PHASES.forEach(phase => {
-    const isActiveInData = activePhases.includes(phase.label) || activePhases.includes(phase.label.replace(" Engineering", " Eng")); 
-    let isActive = false;
-    
-    if (replayMode) {
-      // In slow motion playback, only illuminate active phases IF the tracer has reached their midpoint
-      const phaseMid = phase.offset + phase.len / 2;
-      if (isActiveInData && replayProgress >= phaseMid) {
-        isActive = true;
-      }
-    } else {
-      isActive = isActiveInData;
-    }
-    
-    if (isActive) zoneCounts[phase.zone]++;
-    // For totals, use the raw data so the summary doesn't look like it's missing tactics
-    totalActive += isActiveInData ? 1 : 0;
-    totalTactics++;
-    
-    // Save current active state for rendering
-    phase.currentActive = isActive;
+  const scoredZones = UKC_ZONES.map((zone) => {
+    zoneCounts[zone.id] = 0;
+    const ring = zone.ring.map((tactic) => {
+      const matched = [];
+      tactic.behaviors.forEach((b) => {
+        techniques.filter((t) => t.behavior === b).forEach((t) => matched.push(t));
+      });
+      const active = matched.length > 0;
+      if (active) { zoneCounts[zone.id]++; totalActive++; }
+      totalTactics++;
+      totalTechniques += matched.length;
+      return { ...tactic, count: matched.length, techniques: matched, active };
+    });
+    return { zone, ring };
   });
 
-  const VW = 820, VH = 330;
-  const CY = 140;
-  
-  const PATH_D = `M 20 270 L 100 270 C 170 270, 240 230, 240 140 A 90 90 0 1 0 60 140 C 60 230, 130 270, 210 270 L 360 270 C 430 270, 500 230, 500 140 A 90 90 0 1 0 320 140 C 320 230, 390 270, 470 270 L 620 270 C 690 270, 760 230, 760 140 A 90 90 0 1 0 580 140 C 580 230, 650 270, 730 270 L 800 270`;
-  const zCol = { "in": "#10b981", "through": "#f59e0b", "out": "#ef4444" };
+  // -----------------------------------------------------------------------
+  // Geometry — stroke-arc method (matches Stellar Cyber ring style)
+  // Rm = ring mid-radius (stroke center), band = stroke-width
+  // The full ring is a stroked circle; active arcs are drawn on top
+  // -----------------------------------------------------------------------
+  const VW = 820, VH = 295;
+  const Rm = 92;          // mid-radius of the ring band
+  const band = 40;        // ring band thickness (stroke-width)
+  const Ro = Rm + band/2; // outer edge = 112
+  const Ri = Rm - band/2; // inner edge = 72
+  const ri = Ri - 8;      // inner center circle radius = 64
+  const CY = 147;
+  const centers = [{ x: 148, id: "in" }, { x: 408, id: "through" }, { x: 668, id: "out" }];
+  const GAP = 2.5;        // degrees gap between segments
+  const LABEL_R = Ro + 16; // radius of tactic labels
 
-  let svgDefs = `
-    <filter id="glow-in" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-    <filter id="glow-through" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-    <filter id="glow-out" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-    <filter id="glow-tracer" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-  `;
+  function pt(cx, r, deg) {
+    const a = (deg - 90) * Math.PI / 180;
+    return [cx + r * Math.cos(a), CY + r * Math.sin(a)];
+  }
+  const f = (n) => n.toFixed(2);
 
-  let svgContent = `<path d="${PATH_D}" fill="none" stroke="#1c2433" stroke-width="26" stroke-linecap="round" />`;
-  
-  RC_PHASES.forEach(phase => {
-    const isActive = phase.currentActive;
-    const col = zCol[phase.zone];
-    const opacity = isActive ? 1 : 0.2;
-    const gap = 2;
-    const segLen = phase.len - (gap * 2);
-    const segOffset = phase.offset + gap;
-    
-    svgContent += `<path d="${PATH_D}" fill="none" stroke="${col}" stroke-width="26" 
-      stroke-dasharray="${segLen} 1000" stroke-dashoffset="-${segOffset}" pathLength="1000"
-      opacity="${opacity}" ${isActive ? `filter="url(#glow-${phase.zone})"` : ""} />`;
-
-    const textFill = isActive ? "#ffffff" : col;
-    const textOp = isActive ? 1 : 0.6;
-    const fw = isActive ? 800 : 600;
-    
-    svgContent += `<text x="${phase.pMid.x}" y="${phase.pMid.y}" text-anchor="middle" dominant-baseline="central"
-      transform="rotate(${phase.angle.toFixed(1)}, ${phase.pMid.x}, ${phase.pMid.y})"
-      font-family="monospace" font-size="6.8" font-weight="${fw}"
-      fill="${textFill}" opacity="${textOp}" letter-spacing="0.04em"
-      style="text-shadow: 0px 0px 4px #000, 0px 0px 6px #000;">${phase.label.toUpperCase()}</text>`;
-  });
-  
-  if (replayMode) {
-    const tracerOffset = Math.min(replayProgress, 996);
-    svgContent += `<path d="${PATH_D}" fill="none" stroke="#ffffff" stroke-width="26" stroke-linecap="round"
-      stroke-dasharray="4 1000" stroke-dashoffset="-${tracerOffset}" pathLength="1000"
-      filter="url(#glow-tracer)" />`;
+  // Arc path for stroke-based ring segment
+  function arcD(cx, r, a1, a2) {
+    const [sx, sy] = pt(cx, r, a1);
+    const [ex, ey] = pt(cx, r, a2);
+    const large = (a2 - a1) > 180 ? 1 : 0;
+    // avoid degenerate full-circle arc (SVG ignores start==end)
+    return `M ${f(sx)} ${f(sy)} A ${r} ${r} 0 ${large} 1 ${f(ex)} ${f(ey)}`;
   }
 
-  const centerLabels = [
-    { cx: 150, id: "in", label: "IN", subtitle: "Initial Foothold" },
-    { cx: 410, id: "through", label: "THROUGH", subtitle: "Network Propagation" },
-    { cx: 670, id: "out", label: "OUT", subtitle: "Actions on Objectives" }
-  ];
-  
-  centerLabels.forEach(c => {
-    const col = zCol[c.id];
-    const zoneActive = zoneCounts[c.id] > 0;
-    const opacity = zoneActive ? 1 : 0.4;
-    svgContent += `<text x="${c.cx}" y="${CY - 6}" text-anchor="middle" font-family="monospace" font-size="24" font-weight="900" fill="${col}" opacity="${opacity}" ${zoneActive ? `filter="url(#glow-${c.id})"` : ""}>${c.label}</text>`;
-    svgContent += `<text x="${c.cx}" y="${CY + 14}" text-anchor="middle" font-family="monospace" font-size="7.5" font-weight="600" fill="#ffffff" opacity="${opacity}" letter-spacing="0.1em">${c.subtitle.toUpperCase()}</text>`;
+  let svgDefs = "", svgContent = "";
+
+  scoredZones.forEach(({ zone, ring }, zi) => {
+    const cx = centers[zi].x;
+    const col = zone.color;
+    const n = ring.length;
+    const segDeg = 360 / n;
+    const zoneActive = zoneCounts[zone.id] > 0;
+
+    // Glow filters
+    svgDefs += `
+      <filter id="glow-${zone.id}" x="-60%" y="-60%" width="220%" height="220%">
+        <feGaussianBlur stdDeviation="7" result="b"/>
+        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+      <filter id="glowsm-${zone.id}" x="-30%" y="-30%" width="160%" height="160%">
+        <feGaussianBlur stdDeviation="3.5" result="b"/>
+        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>`;
+
+    // ── 1. Base ring — always visible dim outline of the full loop ──
+    svgContent += `<circle cx="${cx}" cy="${CY}" r="${Rm}"
+      fill="none" stroke="${col}" stroke-width="${band}"
+      opacity="${zoneActive ? 0.14 : 0.10}"/>`;
+
+    // ── 2. Per-segment: active arc + tick dividers + labels ──
+    ring.forEach((tactic, i) => {
+      const a1 = i * segDeg + GAP;
+      const a2 = (i + 1) * segDeg - GAP;
+      const aMid = (a1 + a2) / 2;
+
+      // Active arc drawn as thick stroke on top of base ring
+      if (tactic.active) {
+        svgContent += `<path d="${arcD(cx, Rm, a1, a2)}"
+          fill="none" stroke="${col}" stroke-width="${band}"
+          stroke-linecap="butt" opacity="0.92"
+          filter="url(#glowsm-${zone.id})"/>`;
+      }
+
+      // Thin dark tick at segment boundary (gives chevron-like divisions)
+      const [tx1, ty1] = pt(cx, Ri + 1, i * segDeg);
+      const [tx2, ty2] = pt(cx, Ro - 1, i * segDeg);
+      svgContent += `<line x1="${f(tx1)}" y1="${f(ty1)}" x2="${f(tx2)}" y2="${f(ty2)}"
+        stroke="#0a0d11" stroke-width="2" opacity="0.85"/>`;
+
+      // Tactic label outside the ring
+      const [lx, ly] = pt(cx, LABEL_R, aMid);
+      // Rotate so text runs tangentially (clockwise) — flip bottom half
+      const rot = aMid <= 180 ? aMid - 90 : aMid + 90;
+      svgContent += `<text x="${f(lx)}" y="${f(ly)}"
+        text-anchor="middle" dominant-baseline="central"
+        transform="rotate(${f(rot)},${f(lx)},${f(ly)})"
+        font-family="monospace" font-size="6.8" font-weight="${tactic.active ? 700 : 400}"
+        fill="${col}" opacity="${tactic.active ? 1 : 0.42}"
+        letter-spacing="0.06em">${tactic.label.toUpperCase()}</text>`;
+    });
+
+    // ── 3. Inner center circle ──
+    svgContent += `<circle cx="${cx}" cy="${CY}" r="${ri}"
+      fill="${zoneActive ? col : "#0b0f15"}" stroke="${col}"
+      stroke-width="${zoneActive ? 2 : 0.8}"
+      opacity="${zoneActive ? 0.94 : 0.35}"
+      ${zoneActive ? `filter="url(#glow-${zone.id})"` : ""}/>`;
+
+    // Zone label in center
+    const tc = zoneActive ? "#060809" : col;
+    const fz = zone.id === "through" ? 11 : 14;
+    svgContent += `<text x="${cx}" y="${CY - 8}" text-anchor="middle"
+      font-family="monospace" font-size="${fz}" font-weight="900"
+      fill="${tc}" letter-spacing="0.1em">${zone.label}</text>`;
+    svgContent += `<text x="${cx}" y="${CY + 7}" text-anchor="middle"
+      font-family="monospace" font-size="4.8" font-weight="600"
+      fill="${tc}" opacity="0.72" letter-spacing="0.14em">${zone.subtitle.toUpperCase()}</text>`;
     if (zoneActive) {
-      const totalInZone = RC_PHASES.filter(p => p.zone === c.id).length;
-      svgContent += `<text x="${c.cx}" y="${CY + 28}" text-anchor="middle" font-family="monospace" font-size="6.5" font-weight="700" fill="#ffffff" opacity="0.8">${zoneCounts[c.id]} / ${totalInZone} ACTIVE</text>`;
+      svgContent += `<text x="${cx}" y="${CY + 19}" text-anchor="middle"
+        font-family="monospace" font-size="5" font-weight="700"
+        fill="${tc}" opacity="0.65">${zoneCounts[zone.id]}/${ring.length} ACTIVE</text>`;
     }
+  });
+
+  // ── Bridge connectors — gradient chevron arrows between loops ──
+  [[0,1],[1,2]].forEach(([a, b]) => {
+    const x1 = centers[a].x + Ri;
+    const x2 = centers[b].x - Ri;
+    const mx = (x1 + x2) / 2;
+    const c1 = UKC_ZONES[a].color, c2 = UKC_ZONES[b].color;
+    const gid = `brg${a}${b}`;
+    const bh = 11;
+    svgDefs += `<linearGradient id="${gid}" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="${c1}" stop-opacity="0.65"/>
+      <stop offset="100%" stop-color="${c2}" stop-opacity="0.65"/>
+    </linearGradient>`;
+    // Chevron: flat left wall, angled right tip
+    const bPath = `M${f(x1)},${f(CY-bh)} L${f(x2)},${f(CY-bh)} L${f(x2+10)},${CY} L${f(x2)},${f(CY+bh)} L${f(x1)},${f(CY+bh)} Z`;
+    svgContent += `<path d="${bPath}" fill="url(#${gid})" opacity="0.55"/>`;
+    // small chevron mark at midpoint
+    svgContent += `<polygon points="${f(mx+6)},${CY} ${f(mx-2)},${f(CY-5)} ${f(mx-2)},${f(CY+5)}"
+      fill="url(#${gid})" opacity="0.9"/>`;
   });
 
   const svgHTML = `<svg class="ukc-loops-svg" viewBox="0 0 ${VW} ${VH}" preserveAspectRatio="xMidYMid meet">
     <defs>${svgDefs}</defs>${svgContent}</svg>`;
 
+  // ── Bottom chevron flow bar ──
+  const allFlow = scoredZones.flatMap(({ zone }) =>
+    zone.flow.map((label) => ({ label, color: zone.color, id: zone.id }))
+  );
+  const flowHTML = allFlow.map((item, i) => {
+    const isLast = i === allFlow.length - 1;
+    const prevZone = i > 0 ? allFlow[i-1].id : null;
+    const bc = prevZone && prevZone !== item.id ? " ukc-flow-zone-break" : "";
+    return `<div class="ukc-flow-item${bc}" style="--fc:${item.color}" data-cycle="${item.id}">
+      <span class="ukc-flow-label">${item.label}</span>
+      ${!isLast ? `<span class="ukc-flow-arrow">&#x276F;</span>` : ""}
+    </div>`;
+  }).join("");
+
   container.innerHTML = `<div class="ukc-diagram">
     <div class="ukc-loops">${svgHTML}</div>
+    <div class="ukc-flow-bar">${flowHTML}</div>
   </div>`;
 
   if (summaryEl) {
     const pct = Math.round((totalActive / totalTactics) * 100);
-    const btnHtml = `<button id="btn-replay-ukc" class="btn" style="padding: 2px 8px; font-size: 10px; margin-right: 12px; background: ${replayMode ? '#ef4444' : '#00bfb3'}; color: ${replayMode ? '#fff' : '#000'}; font-weight: bold; border-radius: 4px; cursor: pointer; border: none;">${replayMode ? '■ STOP' : '► REPLAY'}</button>`;
-    
     summaryEl.innerHTML =
-      btnHtml +
-      `<span class="ukc-stat"><b>${behaviorsExecuted.length}</b> behaviors</span>` +
+      `<span class="ukc-stat"><b>${totalTechniques}</b> techniques</span>` +
       `<span class="ukc-sep">&middot;</span>` +
       `<span class="ukc-stat"><b>${totalActive}</b>/${totalTactics} tactics active</span>` +
       `<span class="ukc-sep">&middot;</span>` +
@@ -544,17 +522,7 @@ function renderKillChain() {
       `<span class="ukc-stat zone-through"><b>${zoneCounts.through||0}/6</b> THROUGH</span>` +
       `<span class="ukc-stat zone-out"><b>${zoneCounts.out||0}/4</b> OUT</span>` +
       `<span class="ukc-sep">&middot;</span>` +
-      `<span class="ukc-stat" style="opacity:0.38;font-size:9px">Pols (2017) Ground Truth Mapping</span>`;
-      
-    document.getElementById("btn-replay-ukc").addEventListener("click", () => {
-      if (replayMode) {
-        if (replayAnim) cancelAnimationFrame(replayAnim);
-        replayMode = false;
-        renderKillChain();
-      } else {
-        playUKCReplay();
-      }
-    });
+      `<span class="ukc-stat" style="opacity:0.38;font-size:9px">Pols (2017) §§3.2-3.4</span>`;
   }
 }
 

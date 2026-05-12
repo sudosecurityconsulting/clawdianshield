@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8" />
@@ -23,8 +23,10 @@
     <a data-tab="events">Live Stream</a>
     <a data-tab="runs">Scenario Runs</a>
     <a data-tab="attack">ATT&amp;CK Map</a>
+    <a data-tab="builder">Scenario Builder</a>
   </nav>
   <div class="status-cluster">
+    <button id="theme-toggle" class="btn" style="padding: 4px 8px; font-size: 10px;">THEME</button>
     <span class="status-pill ok"><span class="dot"></span> SENSORS ONLINE</span>
     <span id="ws-pill" class="status-pill warn"><span class="dot"></span> WS CONNECTING</span>
     <span class="clock" id="clock">--:--:-- UTC</span>
@@ -174,6 +176,77 @@
     <div class="panel">
       <div class="panel-head"><span>ACTIVE TECHNIQUES (LATEST RUN)</span><span class="panel-sub" id="active-attack-meta">no run loaded</span></div>
       <div class="panel-body" id="active-attack-list"></div>
+    </div>
+  </section>
+
+  <!-- ===================== SCENARIO BUILDER ===================== -->
+  <section class="tab hidden" id="tab-builder">
+    <div class="brief-toolbar" style="margin-top: 0; margin-bottom: 14px;">
+      <div class="brief-toolbar-left">
+        <span class="panel-sub">SCENARIO DESIGNER</span>
+        <select id="builder-mode" class="brief-model">
+          <option value="simple">Simple Mode</option>
+          <option value="advanced">Advanced Mode (JSON)</option>
+        </select>
+      </div>
+      <div class="brief-toolbar-right">
+        <button class="btn btn-primary" id="btn-save-scenario">SAVE SCENARIO</button>
+      </div>
+    </div>
+
+    <!-- Simple Mode -->
+    <div class="panel" id="builder-simple">
+      <div class="panel-head"><span>GUIDED SETUP</span><span class="panel-sub">Design scenarios easily</span></div>
+      <div class="panel-body" style="display: flex; flex-direction: column; gap: 14px;">
+        <div class="filter-group" style="width: 100%; max-width: 400px;">
+          <label>SCENARIO NAME</label>
+          <input type="text" id="scenario-name" placeholder="e.g. lateral_movement_001" style="width: 100%;">
+        </div>
+        <div class="filter-group" style="width: 100%; max-width: 400px;">
+          <label>DESCRIPTION</label>
+          <input type="text" id="scenario-desc" placeholder="What does this scenario do?" style="width: 100%;">
+        </div>
+        <div style="border-top: 1px solid var(--panel-border); padding-top: 14px;">
+          <h4 style="margin: 0 0 10px 0; font-size: 11px; color: var(--text-dim); letter-spacing: 0.1em; text-transform: uppercase;">BEHAVIORS</h4>
+          <div class="empty-hint" style="text-align: center; margin-bottom: 10px;">Select behaviors to add to this scenario execution chain.</div>
+          <div class="grid-3c">
+            <label class="filter-group toggle" style="background: var(--bg-elev-2); padding: 8px; border-radius: 4px; border: 1px solid var(--panel-border);">
+              <input type="checkbox" value="auth_anomalies" class="behavior-cb"> Auth Anomalies
+            </label>
+            <label class="filter-group toggle" style="background: var(--bg-elev-2); padding: 8px; border-radius: 4px; border: 1px solid var(--panel-border);">
+              <input type="checkbox" value="file_tamper" class="behavior-cb"> File Tampering
+            </label>
+            <label class="filter-group toggle" style="background: var(--bg-elev-2); padding: 8px; border-radius: 4px; border: 1px solid var(--panel-border);">
+              <input type="checkbox" value="remote_execution_artifacts" class="behavior-cb"> Remote Execution
+            </label>
+            <label class="filter-group toggle" style="background: var(--bg-elev-2); padding: 8px; border-radius: 4px; border: 1px solid var(--panel-border);">
+              <input type="checkbox" value="anti_forensics" class="behavior-cb"> Anti-Forensics
+            </label>
+            <label class="filter-group toggle" style="background: var(--bg-elev-2); padding: 8px; border-radius: 4px; border: 1px solid var(--panel-border);">
+              <input type="checkbox" value="persistence_path_changes" class="behavior-cb"> Persistence Mutate
+            </label>
+            <label class="filter-group toggle" style="background: var(--bg-elev-2); padding: 8px; border-radius: 4px; border: 1px solid var(--panel-border);">
+              <input type="checkbox" value="staging" class="behavior-cb"> Staging / Collection
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Advanced Mode -->
+    <div class="panel hidden" id="builder-advanced">
+      <div class="panel-head"><span>ADVANCED MODE</span><span class="panel-sub">Raw JSON Editor</span></div>
+      <div class="panel-body" style="padding: 0;">
+        <textarea id="scenario-json" spellcheck="false" style="width: 100%; height: 400px; background: var(--bg-elev); color: var(--text); font-family: var(--mono); font-size: 13px; border: none; padding: 16px; resize: none;">
+{
+  "id": "custom_scenario_001",
+  "name": "Custom Scenario",
+  "description": "Enter your raw scenario definition here.",
+  "hosts": ["workstation-1"],
+  "behaviors": []
+}
+        </textarea>
+      </div>
     </div>
   </section>
 </main>
