@@ -1,0 +1,34 @@
+{
+  "scenario_id": "dependency_swap_001",
+  "name": "Dependency Swap / Local Supply Chain Emulation",
+  "class_name": "supply_chain_emulation",
+  "mode": "lab_only",
+  "risk_level": "critical",
+  "hosts": ["workstation-1"],
+  "preconditions": ["telemetry collector active", "monitored directories seeded"],
+  "behavior_profile": {
+    "file_tamper": true,
+    "cleanup": true
+  },
+  "expected_telemetry": {
+    "file_events": true,
+    "hash_deltas": true,
+    "process_events": true,
+    "timeline_reconstruction": true
+  },
+  "detections_expected": [
+    "sensitive_path_modification_detected",
+    "content_hash_mismatch_detected"
+  ],
+  "success_criteria": [
+    "same-name content replacement detected",
+    "trust-path tamper scored aggressively",
+    "downstream execution, if observed, links back to modification"
+  ],
+  "safety_constraints": {
+    "no_real_exploit_logic": true,
+    "no_real_credential_attack_logic": true,
+    "no_unapproved_network_spread": true,
+    "lab_environment_only": true
+  }
+}

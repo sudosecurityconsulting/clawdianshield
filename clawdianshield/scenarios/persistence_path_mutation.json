@@ -1,0 +1,30 @@
+{
+  "scenario_id": "persistence_path_mutation_001",
+  "name": "Persistence Path Mutation",
+  "class_name": "persistence_path_validation",
+  "mode": "lab_only",
+  "risk_level": "critical",
+  "hosts": ["workstation-1"],
+  "preconditions": ["telemetry collector active", "monitored directories seeded"],
+  "behavior_profile": {
+    "persistence_path_changes": true,
+    "cleanup": true
+  },
+  "expected_telemetry": {
+    "file_events": true,
+    "hash_deltas": true,
+    "process_events": true
+  },
+  "detections_expected": ["persistence_path_write_detected"],
+  "success_criteria": [
+    "persistence-sensitive paths explicitly flagged",
+    "scoring reflects path criticality",
+    "linked modifications surface as one scenario"
+  ],
+  "safety_constraints": {
+    "no_real_exploit_logic": true,
+    "no_real_credential_attack_logic": true,
+    "no_unapproved_network_spread": true,
+    "lab_environment_only": true
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "scenario_id": "sensitive_config_drift_001",
+  "name": "Sensitive Config Drift",
+  "class_name": "fim_low_and_slow",
+  "mode": "lab_only",
+  "risk_level": "medium",
+  "hosts": ["workstation-1"],
+  "preconditions": ["telemetry collector active", "monitored directories seeded"],
+  "behavior_profile": {
+    "file_tamper": true,
+    "cleanup": true
+  },
+  "expected_telemetry": {
+    "file_events": true,
+    "hash_deltas": true,
+    "timeline_reconstruction": true
+  },
+  "detections_expected": ["sensitive_path_modification_detected"],
+  "success_criteria": [
+    "drift not buried by volume-based thresholds",
+    "critical-path weighting works",
+    "repeated changes correlate to same scenario instance"
+  ],
+  "safety_constraints": {
+    "no_real_exploit_logic": true,
+    "no_real_credential_attack_logic": true,
+    "no_unapproved_network_spread": true,
+    "lab_environment_only": true
+  }
+}

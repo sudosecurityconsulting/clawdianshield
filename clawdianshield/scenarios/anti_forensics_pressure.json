@@ -1,0 +1,31 @@
+{
+  "scenario_id": "anti_forensics_pressure_001",
+  "name": "Anti-Forensics Pressure Test",
+  "class_name": "defense_impairment_emulation",
+  "mode": "lab_only",
+  "risk_level": "critical",
+  "hosts": ["workstation-1"],
+  "preconditions": ["telemetry collector active", "monitored log paths seeded"],
+  "behavior_profile": {
+    "file_tamper": true,
+    "anti_forensics": true,
+    "cleanup": true
+  },
+  "expected_telemetry": {
+    "file_events": true,
+    "timeline_reconstruction": true,
+    "hash_deltas": true
+  },
+  "detections_expected": ["anti_forensics_flagged"],
+  "success_criteria": [
+    "anti-forensics paths are high priority",
+    "truncate vs delete differentiated where possible",
+    "pre-cleanup activity stays recoverable in timeline"
+  ],
+  "safety_constraints": {
+    "no_real_exploit_logic": true,
+    "no_real_credential_attack_logic": true,
+    "no_unapproved_network_spread": true,
+    "lab_environment_only": true
+  }
+}

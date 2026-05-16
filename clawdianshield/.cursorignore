@@ -1,0 +1,13 @@
+# Secrets — never index real credentials
+.env
+.env.*
+!.env.example
+
+# Dependencies
+node_modules/
+
+# Key/cert files
+*.pem
+*.key
+*.p12
+*.pfx

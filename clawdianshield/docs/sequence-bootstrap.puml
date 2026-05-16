@@ -1,0 +1,100 @@
+@startuml ClawdianShield Bootstrap Sequence
+!theme plain
+skinparam backgroundColor #FAFAFA
+skinparam sequenceArrowThickness 2
+skinparam sequenceParticipant underline
+skinparam sequence {
+  ActorBackgroundColor #D6EAF8
+  ActorBorderColor #2E86C1
+  ParticipantBackgroundColor #E8F8F5
+  ParticipantBorderColor #1E8449
+  LifeLineBorderColor #AAB7B8
+  LifeLineBackgroundColor #F2F3F4
+  NoteBackgroundColor #FEF9E7
+  NoteBorderColor #D4AC0D
+}
+
+title ClawdianShield — linear-bootstrap.js Sequence\n(as of April 2026)
+
+actor Developer as Dev
+participant "npm run\nbootstrap-linear" as NPM
+participant "dotenv/config" as Dotenv
+participant ".env" as Env
+participant "LinearClient\n(@linear/sdk)" as SDK
+participant "Linear API\n(linear.app)" as API
+
+== Startup ==
+Dev -> NPM : npm run bootstrap-linear
+activate NPM
+NPM -> Dotenv : import "dotenv/config"
+activate Dotenv
+Dotenv -> Env : read LINEAR_API_KEY
+Env --> Dotenv : key value
+Dotenv --> NPM : process.env.LINEAR_API_KEY set
+deactivate Dotenv
+
+NPM -> NPM : guard: key missing? → exit(1)
+note right : Fails fast if .env\nnot configured
+
+NPM -> SDK : new LinearClient({ apiKey })
+activate SDK
+
+== Team Resolution ==
+NPM -> API : client.teams()
+activate API
+API --> NPM : teams.nodes[]
+deactivate API
+NPM -> NPM : team = nodes[0]\nguard: no team → exit(1)
+note right : Team must exist\nin Linear first
+
+== Project Resolution ==
+NPM -> API : client.projects()
+activate API
+API --> NPM : projects.nodes[]
+deactivate API
+
+alt project "ClawdianShield" not found
+  NPM -> API : client.createProject({ name, teamIds })
+  activate API
+  API --> NPM : { project }
+  deactivate API
+  NPM -> NPM : log "Created project"
+else project found
+  NPM -> NPM : log "Found project"
+end
+
+== Label & Duplicate Guard ==
+NPM -> API : team.labels()
+activate API
+API --> NPM : labelsResult.nodes[]
+deactivate API
+NPM -> NPM : build labelMap { name → id }
+
+NPM -> API : client.issues({ filter: projectId })
+activate API
+API --> NPM : existing issues[]
+deactivate API
+NPM -> NPM : existingTitles = Set(titles)
+
+== Issue Creation Loop ==
+loop for each group in BACKLOG
+  loop for each title in group.issues
+    alt title in existingTitles
+      NPM -> NPM : log "skip (exists)" ⏭\nskipped++
+    else new issue
+      NPM -> API : client.createIssue({ teamId, projectId,\ntitle, labelIds, description })
+      activate API
+      API --> NPM : issue created ✓
+      deactivate API
+      NPM -> NPM : log "✓ [label] title"\ncreated++
+    end
+  end
+end
+
+== Summary ==
+NPM -> Dev : log "Created: N  Skipped: N"
+NPM -> Dev : log "Backlog bootstrap complete."
+deactivate SDK
+deactivate NPM
+
+@enduml

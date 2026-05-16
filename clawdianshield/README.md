@@ -9,8 +9,8 @@
 **A detection engineering platform and adversary emulation pipeline.** A working, deterministic, zero-outbound digital crime scene engineered to produce the exact telemetry your SOC is almost certainly missing right now.
 
 > [!IMPORTANT]
-> **Status: Phase 2 (SOC/IR Dashboard + AI Intelligence) COMPLETE. Phase 3 (Telemetry Forwarders) NEXT.**
-> This is not slide-deck theory. End-to-end verified scenarios stream live telemetry from host-side observers, through a real-time WebSocket dashboard, into a Gemini-powered analyst brief. If your SIEM would have caught it, this tells you. If not, this tells you louder.
+> **Status: Phase 2b (SOC Dashboard + AI Intelligence) COMPLETE. Phase 3a (Splunk HEC Telemetry Forwarder) NEXT.**
+> End-to-end verified: scenarios stream live telemetry from host-side observers through a real-time WebSocket dashboard into a Gemini-powered analyst brief. If your SIEM would have caught it, this tells you. If not, this tells you louder.
 
 ---
 

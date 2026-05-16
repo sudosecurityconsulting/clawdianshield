@@ -1,0 +1,35 @@
+{
+  "scenario_id": "remote_exec_artifacts_001",
+  "name": "Remote Execution Artifact Chain",
+  "class_name": "cross_host_remote_execution",
+  "mode": "lab_only",
+  "risk_level": "high",
+  "hosts": ["workstation-1", "server-1"],
+  "preconditions": ["telemetry collector active", "host inventory available", "lab snapshot restored"],
+  "behavior_profile": {
+    "auth_anomalies": true,
+    "remote_execution_artifacts": true,
+    "cleanup": true
+  },
+  "expected_telemetry": {
+    "process_events": true,
+    "file_events": true,
+    "auth_events": true,
+    "host_to_host_correlation": true
+  },
+  "detections_expected": [
+    "cross_host_activity_correlated",
+    "remote_exec_detected"
+  ],
+  "success_criteria": [
+    "remote activity connected to originating host",
+    "short-lived artifacts retained in storyline",
+    "cross-host timeline remains coherent"
+  ],
+  "safety_constraints": {
+    "no_real_exploit_logic": true,
+    "no_real_credential_attack_logic": true,
+    "no_unapproved_network_spread": true,
+    "lab_environment_only": true
+  }
+}

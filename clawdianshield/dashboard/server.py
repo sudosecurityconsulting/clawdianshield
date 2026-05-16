@@ -377,7 +377,7 @@ def build_app(evidence_dir: Path, reports_dir: Path) -> FastAPI:
 
         try:
             try:
-                from claudianShield.intelligence.gemini_client import (
+                from clawdianshield.intelligence.gemini_client import (
                     GeminiNotConfigured,
                     generate_brief as _gen,
                 )

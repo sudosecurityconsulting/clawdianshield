@@ -9,7 +9,7 @@ The model defaults to gemini-2.5-flash (overridable via the GEMINI_MODEL env
 var or per-request argument). Briefs are written to
 reports/<run_id>_brief.json so re-clicks don't re-bill.
 
-Reads GEMINI_API_KEY (or GOOGLE_API_KEY as fallback) from claudianShield/.env.
+Reads GEMINI_API_KEY (or GOOGLE_API_KEY as fallback) from clawdianshield/.env.
 Uses the google-genai SDK (google.genai), not the deprecated google-generativeai.
 """
 from __future__ import annotations
@@ -58,7 +58,7 @@ def _api_key() -> str:
     if not key:
         raise GeminiNotConfigured(
             "GEMINI_API_KEY (or GOOGLE_API_KEY) is not set. "
-            "Add it to claudianShield/.env"
+            "Add it to clawdianshield/.env"
         )
     return key
 

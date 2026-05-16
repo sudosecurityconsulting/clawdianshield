@@ -1,0 +1,30 @@
+{
+  "scenario_id": "trusted_binary_blend_001",
+  "name": "Trusted Binary Tamper Blend",
+  "class_name": "fim_trusted_binary",
+  "mode": "lab_only",
+  "risk_level": "medium",
+  "hosts": ["workstation-1"],
+  "preconditions": ["telemetry collector active", "monitored directories seeded"],
+  "behavior_profile": {
+    "file_tamper": true,
+    "cleanup": true
+  },
+  "expected_telemetry": {
+    "file_events": true,
+    "hash_deltas": true,
+    "process_events": true
+  },
+  "detections_expected": ["sensitive_path_modification_detected"],
+  "success_criteria": [
+    "trusted binaries do not suppress high-risk path alerts",
+    "process ancestry preserved",
+    "suspicious context outranks binary reputation alone"
+  ],
+  "safety_constraints": {
+    "no_real_exploit_logic": true,
+    "no_real_credential_attack_logic": true,
+    "no_unapproved_network_spread": true,
+    "lab_environment_only": true
+  }
+}

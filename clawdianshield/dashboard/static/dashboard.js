@@ -335,6 +335,13 @@ function precomputePath() {
     
     phase.pMid = pMid;
     phase.angle = angle;
+
+    const endPct = Math.min(0.999, (currentOffset + phase.len - 2) / 1000);
+    phase.pEnd = tempPath.getPointAtLength(endPct * pathTotalLen);
+    const pe1 = tempPath.getPointAtLength(Math.max(0, endPct - 0.004) * pathTotalLen);
+    const pe2 = tempPath.getPointAtLength(Math.min(0.999, endPct + 0.004) * pathTotalLen);
+    phase.angleEnd = Math.atan2(pe2.y - pe1.y, pe2.x - pe1.x) * 180 / Math.PI;
+
     currentOffset += phase.len;
   });
   
@@ -462,12 +469,12 @@ function renderKillChain() {
   const CY = 140;
   
   const PATH_D = `M 20 270 L 100 270 C 170 270, 240 230, 240 140 A 90 90 0 1 0 60 140 C 60 230, 130 270, 210 270 L 360 270 C 430 270, 500 230, 500 140 A 90 90 0 1 0 320 140 C 320 230, 390 270, 470 270 L 620 270 C 690 270, 760 230, 760 140 A 90 90 0 1 0 580 140 C 580 230, 650 270, 730 270 L 800 270`;
-  const zCol = { "in": "#10b981", "through": "#f59e0b", "out": "#ef4444" };
+  const zCol = { "in": "#22c55e", "through": "#f97316", "out": "#f43f5e" };
 
   let svgDefs = `
-    <filter id="glow-in" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-    <filter id="glow-through" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-    <filter id="glow-out" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="glow-in" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="9" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="glow-through" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="9" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="glow-out" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="9" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
     <filter id="glow-tracer" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
   `;
 
@@ -481,19 +488,25 @@ function renderKillChain() {
     const segLen = phase.len - (gap * 2);
     const segOffset = phase.offset + gap;
     
-    svgContent += `<path d="${PATH_D}" fill="none" stroke="${col}" stroke-width="26" 
+    svgContent += `<path d="${PATH_D}" fill="none" stroke="${col}" stroke-width="26"
       stroke-dasharray="${segLen} 1000" stroke-dashoffset="-${segOffset}" pathLength="1000"
       opacity="${opacity}" ${isActive ? `filter="url(#glow-${phase.zone})"` : ""} />`;
 
-    const textFill = isActive ? "#ffffff" : col;
-    const textOp = isActive ? 1 : 0.6;
+    if (phase.pEnd) {
+      const chs = 11;
+      svgContent += `<polygon points="0,${-chs} ${(chs * 0.65).toFixed(1)},0 0,${chs}"
+        fill="${col}" opacity="${isActive ? 0.92 : 0.16}"
+        transform="translate(${phase.pEnd.x.toFixed(1)},${phase.pEnd.y.toFixed(1)}) rotate(${phase.angleEnd.toFixed(1)})" />`;
+    }
+
+    const textOp = isActive ? 1 : 0.55;
     const fw = isActive ? 800 : 600;
-    
+
     svgContent += `<text x="${phase.pMid.x}" y="${phase.pMid.y}" text-anchor="middle" dominant-baseline="central"
       transform="rotate(${phase.angle.toFixed(1)}, ${phase.pMid.x}, ${phase.pMid.y})"
-      font-family="monospace" font-size="6.8" font-weight="${fw}"
-      fill="${textFill}" opacity="${textOp}" letter-spacing="0.04em"
-      style="text-shadow: 0px 0px 4px #000, 0px 0px 6px #000;">${phase.label.toUpperCase()}</text>`;
+      font-family="monospace" font-size="7.2" font-weight="${fw}"
+      fill="#ffffff" stroke="#000000" stroke-width="2.5" paint-order="stroke fill"
+      opacity="${textOp}" letter-spacing="0.05em">${phase.label.toUpperCase()}</text>`;
   });
   
   if (replayMode) {
@@ -513,11 +526,11 @@ function renderKillChain() {
     const col = zCol[c.id];
     const zoneActive = zoneCounts[c.id] > 0;
     const opacity = zoneActive ? 1 : 0.4;
-    svgContent += `<text x="${c.cx}" y="${CY - 6}" text-anchor="middle" font-family="monospace" font-size="24" font-weight="900" fill="${col}" opacity="${opacity}" ${zoneActive ? `filter="url(#glow-${c.id})"` : ""}>${c.label}</text>`;
-    svgContent += `<text x="${c.cx}" y="${CY + 14}" text-anchor="middle" font-family="monospace" font-size="7.5" font-weight="600" fill="#ffffff" opacity="${opacity}" letter-spacing="0.1em">${c.subtitle.toUpperCase()}</text>`;
+    svgContent += `<text x="${c.cx}" y="${CY - 6}" text-anchor="middle" font-family="monospace" font-size="26" font-weight="900" fill="${col}" stroke="#000000" stroke-width="1.5" paint-order="stroke fill" opacity="${opacity}" ${zoneActive ? `filter="url(#glow-${c.id})"` : ""}>${c.label}</text>`;
+    svgContent += `<text x="${c.cx}" y="${CY + 14}" text-anchor="middle" font-family="monospace" font-size="8" font-weight="700" fill="#ffffff" stroke="#000000" stroke-width="2" paint-order="stroke fill" opacity="${opacity}" letter-spacing="0.1em">${c.subtitle.toUpperCase()}</text>`;
     if (zoneActive) {
       const totalInZone = RC_PHASES.filter(p => p.zone === c.id).length;
-      svgContent += `<text x="${c.cx}" y="${CY + 28}" text-anchor="middle" font-family="monospace" font-size="6.5" font-weight="700" fill="#ffffff" opacity="0.8">${zoneCounts[c.id]} / ${totalInZone} ACTIVE</text>`;
+      svgContent += `<text x="${c.cx}" y="${CY + 28}" text-anchor="middle" font-family="monospace" font-size="7" font-weight="700" fill="#ffffff" stroke="#000000" stroke-width="1.5" paint-order="stroke fill" opacity="0.9">${zoneCounts[c.id]} / ${totalInZone} ACTIVE</text>`;
     }
   });
 

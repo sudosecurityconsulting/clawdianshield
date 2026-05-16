@@ -1,0 +1,33 @@
+{
+  "scenario_id": "collection_staging_001",
+  "name": "Collection and Staging Run",
+  "class_name": "post_compromise_collection",
+  "mode": "lab_only",
+  "risk_level": "high",
+  "hosts": ["workstation-1"],
+  "preconditions": ["telemetry collector active", "monitored directories seeded"],
+  "behavior_profile": {
+    "staging": true,
+    "cleanup": true
+  },
+  "expected_telemetry": {
+    "file_events": true,
+    "hash_deltas": true,
+    "timeline_reconstruction": true
+  },
+  "detections_expected": [
+    "sensitive_path_modification_detected",
+    "staging_archive_detected"
+  ],
+  "success_criteria": [
+    "enumeration and staging are correlated",
+    "archive creation raises priority in sensitive contexts",
+    "cleanup does not erase scenario visibility"
+  ],
+  "safety_constraints": {
+    "no_real_exploit_logic": true,
+    "no_real_credential_attack_logic": true,
+    "no_unapproved_network_spread": true,
+    "lab_environment_only": true
+  }
+}
