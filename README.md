@@ -193,6 +193,27 @@ The server is read-only. It never mutates evidence or fires scenarios.
 
 ---
 
+## SIEM Forwarding — Elastic (Phase 3a)
+
+The `telemetry/forwarders/elastic_shipper.py` shipper bulk-ingests the evidence
+JSONL stream into Elasticsearch (`clawdianshield-events` index) so the same
+ground-truth telemetry the dashboard scores can be queried, pivoted, and
+alerted on from a real SIEM — not just the built-in console.
+
+Bring up the single-node cluster with `docker compose up -d elasticsearch
+kibana`, then run the shipper against `evidence/`. Events land with their full
+NormalizedEvent shape — `collector`, `event_type`, `details.path`, `host`,
+`run_id`, `scenario_id`, `severity`, `timestamp` — so a `fim_burst_001` run is
+fully reconstructable in Kibana Discover.
+
+![Kibana Discover — clawdianshield-events index, 164 shipped events from a fim_burst_001 run, showing per-event collector/path/severity fields and the ingest-volume timeseries](clawdianshield/docs/screenshot-elastic-siem.png)
+
+This is the proof the forwarder works end-to-end: host-side observers →
+evidence JSONL → Elasticsearch bulk → Kibana, with zero fabricated telemetry
+anywhere in the path.
+
+---
+
 ## Scoring Model
 
 Every run is graded across five dimensions.
@@ -267,6 +288,7 @@ All observers emit JSONL using the `NormalizedEvent` schema (`clawdianshield/sha
 | 1 — Core Engine | Scenario executor, Docker victim, safety gate, dry-run mode | Complete |
 | 2 — SOC Dashboard | FastAPI + WebSocket console, UKC visualization, ATT&CK map | Complete |
 | 2b — AI Intelligence | Gemini brief generation, model selector, cached reports | Complete |
+| 3a — Telemetry | Elastic shipper (`telemetry/forwarders/elastic_shipper.py`) — JSONL → Elasticsearch + Kibana | Working (live-verified) |
 | 3a — Telemetry | Splunk HEC forwarder (`clawdianshield/telemetry/`) | Backlog |
 | 3b — CVE Intelligence | NVD/CISA KEV feed mapped to observed ATT&CK techniques | Backlog |
 | 3c — Scenario Expansion | Container escape, credential access, cloud metadata abuse | Backlog |
