@@ -1,0 +1,31 @@
+# Root .gitignore — repo-wide. Per-project rules live in clawdianshield/.gitignore
+
+# Runner output — CLAUDE.md: never commit reports/
+reports/
+
+# Orchestration tooling — intentionally excluded from version control
+# (see CLAUDE.md / PHASE3_STATUS.md)
+mission-control
+mission-control.md
+orchestration/
+clawdianshield/intelligence/gemini_bridge.py
+
+# External tool checkouts (not submodules — no .gitmodules)
+Roo-Code
+Zoo-Code
+
+# One-off / throwaway patch scripts
+fix_*.py
+
+# Editor + extension binaries / large media
+*.vsix
+*.mp4
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
