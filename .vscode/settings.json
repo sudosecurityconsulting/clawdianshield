@@ -1,0 +1,22 @@
+{
+    "window.zoomPerWindow": false,
+    "search.quickOpen.history.filterSortOrder": "recency",
+    "search.quickOpen.includeSymbols": true,
+    "editor.formatOnSave": true,
+    
+    "[python]": {
+      "editor.defaultFormatter": "charliermarsh.ruff",
+      "editor.codeActionsOnSave": {
+        "source.fixAll": "explicit",
+        "source.organizeImports": "explicit"
+      }
+    },
+    
+    "[javascript]": {
+      "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    
+    "[javascriptreact]": {
+      "editor.defaultFormatter": "esbenp.prettier-vscode"
+    }
+  }

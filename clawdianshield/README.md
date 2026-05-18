@@ -9,8 +9,8 @@
 **A detection engineering platform and adversary emulation pipeline.** A working, deterministic, zero-outbound digital crime scene engineered to produce the exact telemetry your SOC is almost certainly missing right now.
 
 > [!IMPORTANT]
-> **Status: Phase 2b (SOC Dashboard + AI Intelligence) COMPLETE. Phase 3a (Splunk HEC Telemetry Forwarder) NEXT.**
-> End-to-end verified: scenarios stream live telemetry from host-side observers through a real-time WebSocket dashboard into a Gemini-powered analyst brief. If your SIEM would have caught it, this tells you. If not, this tells you louder.
+> **Status: Phase 3 (ELK SIEM Integration & Confluence AI Reporting) COMPLETE. Phase 4 NEXT.**
+> End-to-end verified: scenarios stream live telemetry from host-side observers into local Elasticsearch, displaying on our live dashboard, and generating Gemini-powered incident briefs that are automatically published to Confluence.
 
 ---
 
@@ -301,9 +301,9 @@ All observers emit JSONL to `evidence/` using the `NormalizedEvent` schema (`sha
 | 1 — Core Engine | Scenario executor, Docker victim, safety gate, dry-run mode | ✅ Complete |
 | 2 — SOC Dashboard | FastAPI + WebSocket console, UKC visual playback, ATT&CK map | ✅ Complete |
 | 2b — AI Intelligence | Gemini brief generation, google-genai SDK, model selector | ✅ Complete |
-| 3a — Telemetry | Splunk HEC forwarder (`telemetry/`) | 📋 Backlog |
-| 3b — CVE Intelligence | NVD/CISA KEV feed → ATT&CK technique correlation | 📋 Backlog |
-| 3c — Scenario Expansion | Container escape, cred access, cloud metadata abuse scenarios | 📋 Backlog |
+| 3 — SIEM & Reporting | ELK Stack Integration (`elastic_shipper.py`), Confluence Publishing | ✅ Complete |
+| 4a — CVE Intelligence | NVD/CISA KEV feed → ATT&CK technique correlation | 📋 Backlog |
+| 4b — Scenario Expansion | Container escape, cred access, cloud metadata abuse scenarios | 📋 Backlog |
 
 ---
 

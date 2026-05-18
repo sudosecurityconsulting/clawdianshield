@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/MyPC/.claude/**)",
+      "Bash(curl -s http://localhost:8088/ -o /dev/null -w \"%{http_code}\")",
+      "Bash(docker compose *)",
+      "WebSearch",
+      "Bash(taskkill /F /FI \"WINDOWTITLE eq *dashboard.server*\" /T)",
+      "Bash(taskkill /F /FI \"COMMANDLINE eq *dashboard.server*\" /T)",
+      "Bash(netstat -ano)",
+      "Bash(awk '{print $5}')",
+      "Bash(taskkill /PID 15396 /F)",
+      "Bash(kill 15396)",
+      "Bash(powershell -Command \"Stop-Process -Id 15396 -Force\")",
+      "Bash(powershell -Command \"Stop-Process -Id \\(Get-NetTCPConnection -LocalPort 8088 -State Listen\\).OwningProcess -Force -ErrorAction SilentlyContinue\")",
+      "Bash(powershell -Command \"Stop-Process -Id \\(Get-NetTCPConnection -LocalPort 8088 -State Listen -ErrorAction SilentlyContinue\\).OwningProcess -Force -ErrorAction SilentlyContinue\")",
+      "Read(//tmp/**)",
+      "Bash(xargs grep *)",
+      "Bash(powershell -Command \"try { Stop-Process -Id \\(Get-NetTCPConnection -LocalPort 8088 -State Listen\\).OwningProcess -Force } catch {}; Start-Sleep 1; Write-Output done\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8088/)",
+      "Bash(curl -s http://localhost:8088/api/stats)",
+      "Bash(taskkill /PID 40504 /F)",
+      "Bash(powershell -Command \"Stop-Process -Id 40504 -Force\")",
+      "Bash(curl -s http://localhost:8088/api/health)",
+      "Read(//k//**)",
+      "Bash(xargs -I{} powershell -Command \"Stop-Process -Id {} -Force\")"
+    ]
+  }
+}

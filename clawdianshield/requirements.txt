@@ -15,6 +15,12 @@ uvicorn[standard]>=0.27.0
 # Phase 3 telemetry — HEC forwarder (telemetry/forwarders/splunk_hec.py)
 requests>=2.32.0
 
+# Phase 3 telemetry — Elasticsearch shipper (telemetry/forwarders/elastic_shipper.py)
+elasticsearch>=8.11.0
+
+# Phase 3 reporting — Confluence publisher (reporting/confluence_publisher.py)
+atlassian-python-api>=3.41.0
+
 # AI intelligence plane (intelligence/gemini_client.py)
 google-genai>=1.0.0
 python-dotenv>=1.0.0
