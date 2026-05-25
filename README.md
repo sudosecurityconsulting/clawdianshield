@@ -49,7 +49,7 @@ When `fim_burst_tamper.json` fires, the execution plane induces real state chang
 }
 ```
 
-![Executive Overview — 138 ingested events, severity timeseries, event type distribution, severity mix, collector feeds, top mutated paths, and active scenario profile with telemetry coverage assessment](clawdianshield/docs/screenshot-overview.png)
+![Executive Overview — 138 ingested events, severity timeseries, event type distribution, severity mix, collector feeds, top mutated paths, and active scenario profile with telemetry coverage assessment](ClawdianShield/docs/screenshot-overview.png)
 
 ---
 
@@ -75,7 +75,7 @@ engine/executor.py                    ← subprocess engine, safety gate, behavi
         │                                        ┌──────────────────────────────────┐
         │  artifacts (real)                      │  collectors/file_observer        │
         ▼                                        │  collectors/log_observer         │
-  clawdian_victim:/tmp/clawdianshield --bind-->  │  (host-side watchdog + tail;     │
+  clawdian_victim:/tmp/ClawdianShield --bind-->  │  (host-side watchdog + tail;     │
   clawdian_victim:/var/log             mount     │   emit JSONL via NormalizedEvent) │
                                                  └──────────────┬───────────────────┘
         │                                                       ▼
@@ -83,7 +83,7 @@ engine/executor.py                    ← subprocess engine, safety gate, behavi
 reports/<run_id>_exec_log.json                      evidence/auth_events.jsonl
 ```
 
-Full PlantUML diagrams: [`clawdianshield/docs/architecture.puml`](clawdianshield/docs/architecture.puml)
+Full PlantUML diagrams: [`ClawdianShield/docs/architecture.puml`](ClawdianShield/docs/architecture.puml)
 
 ---
 
@@ -93,21 +93,21 @@ Full PlantUML diagrams: [`clawdianshield/docs/architecture.puml`](clawdianshield
 
 ```bash
 # 1. Clone
-git clone https://github.com/dadopsmateomaddox/clawdianshield.git
-cd clawdianshield
+git clone https://github.com/dadopsmateomaddox/ClawdianShield.git
+cd ClawdianShield
 
 # 2. Install Python deps
-pip install -r clawdianshield/requirements.txt
+pip install -r ClawdianShield/requirements.txt
 
 # 3. Configure API key for AI briefs (optional — dashboard works without it)
-cp clawdianshield/.env.example clawdianshield/.env
+cp ClawdianShield/.env.example ClawdianShield/.env
 # Edit .env and add: GEMINI_API_KEY=your_key_here
 
 # 4. Seed demo data (no Docker required — populates dashboard immediately)
-python -m clawdianshield.dashboard.seed_demo --reset
+python -m ClawdianShield.dashboard.seed_demo --reset
 
 # 5. Launch the dashboard
-python -m clawdianshield.dashboard.server --host 0.0.0.0 --port 8088
+python -m ClawdianShield.dashboard.server --host 0.0.0.0 --port 8088
 # → http://localhost:8088
 ```
 
@@ -117,22 +117,22 @@ To run a live scenario (requires Docker):
 
 ```bash
 # Spin up the victim container
-docker compose -f clawdianshield/docker/docker-compose.yml up -d clawdian_victim
+docker compose -f ClawdianShield/docker/docker-compose.yml up -d clawdian_victim
 
 # Start observers (Terminal 1)
-python -m clawdianshield.collectors.run \
+python -m ClawdianShield.collectors.run \
   --run-id verify-001 \
   --scenario-id fim_burst_001 \
   --host workstation-1
 
 # Fire the scenario (Terminal 2)
-python clawdianshield/engine/executor.py \
-  clawdianshield/engine/scenarios/fim_burst_tamper.json \
+python ClawdianShield/engine/executor.py \
+  ClawdianShield/engine/scenarios/fim_burst_tamper.json \
   --container clawdian_victim
 
 # Dry-run any scenario without Docker (validates parsing + safety gate)
-python clawdianshield/engine/executor.py \
-  clawdianshield/engine/scenarios/fim_burst_tamper.json --dry-run
+python ClawdianShield/engine/executor.py \
+  ClawdianShield/engine/scenarios/fim_burst_tamper.json --dry-run
 ```
 
 ---
@@ -173,9 +173,9 @@ A Kibana-style analyst console with real-time WebSocket event streaming.
 
 **Incident Brief:** Gemini 2.5 Flash generates a SOC-grade markdown brief per run — executive summary, attack chain narrative, telemetry gap assessment, recommended detections, risk rating.
 
-![Scenario Runs Console — Full Synthetic Intrusion Storyline with AI-generated brief showing attack chain narrative and all 23 execution steps](clawdianshield/docs/screenshot-scenario-runs.png)
+![Scenario Runs Console — Full Synthetic Intrusion Storyline with AI-generated brief showing attack chain narrative and all 23 execution steps](ClawdianShield/docs/screenshot-scenario-runs.png)
 
-![ATT&CK Map — MITRE technique coverage grid with 13 mapped techniques](clawdianshield/docs/screenshot-attack-map.png)
+![ATT&CK Map — MITRE technique coverage grid with 13 mapped techniques](ClawdianShield/docs/screenshot-attack-map.png)
 
 API endpoints:
 
@@ -196,7 +196,7 @@ The server is read-only. It never mutates evidence or fires scenarios.
 ## SIEM Forwarding — Elastic (Phase 3a)
 
 The `telemetry/forwarders/elastic_shipper.py` shipper bulk-ingests the evidence
-JSONL stream into Elasticsearch (`clawdianshield-events` index) so the same
+JSONL stream into Elasticsearch (`ClawdianShield-events` index) so the same
 ground-truth telemetry the dashboard scores can be queried, pivoted, and
 alerted on from a real SIEM — not just the built-in console.
 
@@ -206,7 +206,7 @@ NormalizedEvent shape — `collector`, `event_type`, `details.path`, `host`,
 `run_id`, `scenario_id`, `severity`, `timestamp` — so a `fim_burst_001` run is
 fully reconstructable in Kibana Discover.
 
-![Kibana Discover — clawdianshield-events index, 164 shipped events from a fim_burst_001 run, showing per-event collector/path/severity fields and the ingest-volume timeseries](clawdianshield/docs/screenshot-elastic-siem.png)
+![Kibana Discover — ClawdianShield-events index, 164 shipped events from a fim_burst_001 run, showing per-event collector/path/severity fields and the ingest-volume timeseries](ClawdianShield/docs/screenshot-elastic-siem.png)
 
 This is the proof the forwarder works end-to-end: host-side observers →
 evidence JSONL → Elasticsearch bulk → Kibana, with zero fabricated telemetry
@@ -246,7 +246,7 @@ Every run is graded across five dimensions.
 **Design assumptions:**
 - Only run on lab equipment (dedicated victim container with network mode `none`)
 - Bind-mounts are host-controlled (`victim_state/` and `victim_logs/` dirs)
-- Gemini API key stays in `clawdianshield/.env` — never committed
+- Gemini API key stays in `ClawdianShield/.env` — never committed
 - Docker container has no network access by design
 
 **Safe use boundaries:** Single lab victim container. Cleanup phase runs after every scenario. No lateral movement (single container, network mode none). Air-gapped execution.
@@ -255,7 +255,7 @@ Every run is graded across five dimensions.
 
 ## Telemetry Schema
 
-All observers emit JSONL using the `NormalizedEvent` schema (`clawdianshield/unification/models.py`, Pydantic v2):
+All observers emit JSONL using the `NormalizedEvent` schema (`ClawdianShield/unification/models.py`, Pydantic v2):
 
 ```json
 {
@@ -289,7 +289,7 @@ All observers emit JSONL using the `NormalizedEvent` schema (`clawdianshield/uni
 | 2 — SOC Dashboard | FastAPI + WebSocket console, UKC visualization, ATT&CK map | Complete |
 | 2b — AI Intelligence | Gemini brief generation, model selector, cached reports | Complete |
 | 3a — Telemetry | Elastic shipper (`telemetry/forwarders/elastic_shipper.py`) — JSONL → Elasticsearch + Kibana | Working (live-verified) |
-| 3a — Telemetry | Splunk HEC forwarder (`clawdianshield/telemetry/`) | Backlog |
+| 3a — Telemetry | Splunk HEC forwarder (`ClawdianShield/telemetry/`) | Backlog |
 | 3b — CVE Intelligence | NVD/CISA KEV feed mapped to observed ATT&CK techniques | Backlog |
 | 3c — Scenario Expansion | Container escape, credential access, cloud metadata abuse | Backlog |
 
@@ -298,7 +298,7 @@ All observers emit JSONL using the `NormalizedEvent` schema (`clawdianshield/uni
 ## Repo Structure
 
 ```
-clawdianshield/
+ClawdianShield/
 ├── runner/          executor.py — deterministic subprocess scenario engine + safety gate
 ├── collectors/      file_observer, log_observer, run (host-side streaming observers)
 ├── shared/          models.py — Pydantic v2 NormalizedEvent / RunContext schema

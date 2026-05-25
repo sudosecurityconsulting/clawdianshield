@@ -1,0 +1,12 @@
+{
+  "name": "ClawdianShield-scripts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "bootstrap-linear": "node scripts/linear-bootstrap.js"
+  },
+  "dependencies": {
+    "@linear/sdk": "^27.0.0",
+    "dotenv": "^16.0.0"
+  }
+}

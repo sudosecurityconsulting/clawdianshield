@@ -23,7 +23,10 @@
       "Bash(powershell -Command \"Stop-Process -Id 40504 -Force\")",
       "Bash(curl -s http://localhost:8088/api/health)",
       "Read(//k//**)",
-      "Bash(xargs -I{} powershell -Command \"Stop-Process -Id {} -Force\")"
+      "Bash(xargs -I{} powershell -Command \"Stop-Process -Id {} -Force\")",
+      "Bash(powershell -NoProfile -Command \"\\(Get-Item 'C:\\\\Program Files\\\\Google\\\\Chrome\\\\Application\\\\chrome.exe' -ErrorAction SilentlyContinue\\).VersionInfo.ProductVersion\")",
+      "Bash(curl.exe -s --max-time 5 http://127.0.0.1:9222/json/version)",
+      "Bash(unzip -l /d/MasterVault/SUDO/shai-hulud-kit-main.zip)"
     ]
   }
 }

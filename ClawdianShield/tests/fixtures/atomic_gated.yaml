@@ -1,0 +1,39 @@
+attack_technique: T1547.001
+display_name: 'Boot or Logon Autostart Execution: Registry Run Keys'
+atomic_tests:
+- name: Windows Run key persistence
+  auto_generated_guid: 33333333-3333-3333-3333-333333333333
+  description: Non-linux + non-shell executor — must be gated.
+  supported_platforms:
+  - windows
+  executor:
+    command: |
+      Set-ItemProperty -Path "HKCU:\Software\Run" -Name x -Value y
+    name: powershell
+    elevation_required: false
+- name: Linux sh requiring root
+  auto_generated_guid: 44444444-4444-4444-4444-444444444444
+  description: Linux shell but elevation_required — must be gated.
+  supported_platforms:
+  - linux
+  executor:
+    command: |
+      echo '* * * * * root /bin/true' >> /etc/crontab
+    name: sh
+    elevation_required: true
+- name: Linux sh with prerequisites
+  auto_generated_guid: 55555555-5555-5555-5555-555555555555
+  description: Linux shell but has dependencies — must be gated.
+  supported_platforms:
+  - linux
+  dependencies:
+  - description: needs the thing installed
+    prereq_command: |
+      which thing
+    get_prereq_command: |
+      apt-get install -y thing
+  executor:
+    command: |
+      thing --run
+    name: sh
+    elevation_required: false

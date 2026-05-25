@@ -1,0 +1,19 @@
+attack_technique: T1070.004
+display_name: 'Indicator Removal on Host: File Deletion'
+atomic_tests:
+- name: Delete a single file - Linux
+  auto_generated_guid: 22222222-2222-2222-2222-222222222222
+  description: Deletes a file whose path comes from an input argument default.
+  supported_platforms:
+  - linux
+  - macos
+  input_arguments:
+    file_to_delete:
+      description: Path of the file to delete
+      type: path
+      default: /tmp/ClawdianShield/victim.txt
+  executor:
+    command: |
+      rm -f #{file_to_delete}
+    name: sh
+    elevation_required: false

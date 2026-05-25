@@ -1,0 +1,13 @@
+attack_technique: T1059.004
+display_name: 'Command and Scripting Interpreter: Unix Shell'
+atomic_tests:
+- name: Echo a marker into the lab workdir
+  auto_generated_guid: 11111111-1111-1111-1111-111111111111
+  description: Trivial sh command that writes a file under the lab workdir.
+  supported_platforms:
+  - linux
+  executor:
+    command: |
+      echo 'atomic-marker' > /tmp/ClawdianShield/atomic_marker.txt
+    name: sh
+    elevation_required: false

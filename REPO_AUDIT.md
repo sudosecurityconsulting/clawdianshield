@@ -31,7 +31,7 @@
 | Folder name | **claudianShield** | WRONG — uses "Claud" not "Claw" |
 | Container name | **clawdian_victim** | Correct |
 | Python imports | `claudianShield.*` | Wrong — folder is misnamed |
-| Module references | Mixed `ClaudianShield`, `claudianshield`, `clawdian_` | Chaos |
+| Module references | Mixed `ClawdianShield`, `claudianshield`, `clawdian_` | Chaos |
 | Docs paths | `claudianShield/docs` | Wrong folder name |
 | Commands | `python -m claudianShield.dashboard.server` | Broken due to folder name |
 
@@ -45,11 +45,11 @@ The project folder was named `claudianShield` (capital C, using "Claud" instead 
 
 ### Solution: Rename Folder & Fix All References
 
-**Action:** Rename `claudianShield/` → `clawdianshield/` (lowercase throughout, matches Python package naming convention while preserving "clawdian")
+**Action:** Rename `claudianShield/` → `ClawdianShield/` (lowercase throughout, matches Python package naming convention while preserving "clawdian")
 
 Then update:
-- Python imports everywhere (`from clawdianshield.runners import...`)
-- Docker volume mounts (`/tmp/clawdianshield` ✓ already correct)
+- Python imports everywhere (`from ClawdianShield.runners import...`)
+- Docker volume mounts (`/tmp/ClawdianShield` ✓ already correct)
 - README command examples
 - `.env` file paths in documentation and error messages
 - Package metadata (if any `setup.py` or `pyproject.toml`)
@@ -81,7 +81,7 @@ root/README.md — command examples + paths
 |------|-------|----------|
 | `claudianShield/README.md` | Line 12: "Status: Phase 2" (OUTDATED) | High |
 | `claudianShield/README.md` | Lines contain "Gemini-powered" (fine) but inconsistent phrasing | Medium |
-| `claudianShield/telemetry/collectors/fim.py` | Says "ClaudianShield Phase 1" (WRONG SPELLING) | High |
+| `claudianShield/telemetry/collectors/fim.py` | Says "ClawdianShield Phase 1" (WRONG SPELLING) | High |
 | `claudianShield/intelligence/gemini_client.py` | Error message: "Add it to claudianShield/.env" (wrong path) | High |
 | Various error messages | Inconsistent capitalization in console output | Low |
 
@@ -195,7 +195,7 @@ root/README.md — command examples + paths
 ### Current Structure (Messy)
 
 ```
-clawdianshield/
+ClawdianShield/
 ├── runners/
 ├── collectors/
 ├── shared/
@@ -227,7 +227,7 @@ clawdianshield/
 ### Proposed Structure (Clean)
 
 ```
-clawdianshield/
+ClawdianShield/
 ├── README.md
 ├── requirements.txt
 ├── package.json
@@ -440,7 +440,7 @@ pip install -r requirements.txt
 python scripts/seed_demo_data.py --reset
 
 # 3. Start dashboard
-python -m clawdianshield.dashboard.server &
+python -m ClawdianShield.dashboard.server &
 DASHBOARD_PID=$!
 
 # 4. Wait for server
@@ -602,7 +602,7 @@ Create these new files in `docs/`:
 
 1. **Create `pyproject.toml` or `setup.py`**
    ```python
-   name = "clawdianshield"
+   name = "ClawdianShield"
    version = "0.3.0"  # Phase 3a launch
    description = "Adversary emulation + detection validation platform"
    ```
@@ -650,21 +650,21 @@ Create these new files in `docs/`:
 
 **Time: ~16 hours**
 
-1. ✅ Rename `claudianShield/` → `clawdianshield/` (preserving git history with `git mv`)
+1. ✅ Rename `claudianShield/` → `ClawdianShield/` (preserving git history with `git mv`)
 2. ✅ Update all Python imports across codebase
 3. ✅ Update all documentation paths + examples
 4. ✅ Fix phase status in both READMEs
 5. ✅ Spell-check and terminology audit
 6. ✅ Rewrite root README per new structure
-7. ✅ Commit: `refactor: standardize naming to clawdianshield + rewrite README`
+7. ✅ Commit: `refactor: standardize naming to ClawdianShield + rewrite README`
 
 **Git Workflow:**
 ```bash
 git checkout -b cls-refactor/repo-credibility
-git mv claudianShield clawdianshield
+git mv claudianShield ClawdianShield
 # Update all imports, paths, docs
 git add .
-git commit -m "refactor: standardize naming to clawdianshield; rewrite README per engineering standards"
+git commit -m "refactor: standardize naming to ClawdianShield; rewrite README per engineering standards"
 git push origin cls-refactor/repo-credibility
 # Open PR for review
 ```
@@ -750,7 +750,7 @@ pyproject.toml (or setup.py)
 ### Files to Modify
 ```
 README.md (major rewrite)
-claudianShield/README.md → clawdianshield/README.md (minor cleanup)
+claudianShield/README.md → ClawdianShield/README.md (minor cleanup)
 SECURITY.md (expand)
 .github/workflows/linear-sync.yml (update paths if needed)
 claudianShield/dashboard/server.py (update import paths)
@@ -769,7 +769,7 @@ All docs/ (update path references)
 Once complete, repo should pass:
 
 ### Visual/Structural Audit
-- ✅ Consistent naming (clawdianshield everywhere)
+- ✅ Consistent naming (ClawdianShield everywhere)
 - ✅ Clean folder structure (no ambiguous dirs)
 - ✅ No typos in README or key docs
 - ✅ Clear phase status statement

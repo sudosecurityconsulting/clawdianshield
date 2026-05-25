@@ -1,4 +1,4 @@
-# ClawdianShield — CLAUDE.md
+# ClawdianShield — AGENTS.md
 # Git root: d:/MasterVault/SUDO
 # All paths in this file are relative to the git root unless stated otherwise.
 
