@@ -1,0 +1,50 @@
+# Dependabot config for the project.
+# Strategy: weekly grouped non-security updates (low noise),
+# immediate ungrouped security updates (so CVEs aren't stuck in a batch).
+
+version: 2
+
+updates:
+  # Python dependencies (root)
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: ["minor", "patch"]
+    # Security updates are NEVER grouped — open immediately as individual PRs.
+    # Dependabot does this by default for security advisories.
+    labels:
+      - "dependencies"
+      - "python"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 3
+    groups:
+      all-actions:
+        patterns: ["*"]
+    labels:
+      - "dependencies"
+      - "github-actions"
+
+  # npm (uncomment if project has package.json)
+  # - package-ecosystem: "npm"
+  #   directory: "/"
+  #   schedule:
+  #     interval: "weekly"
+  #   open-pull-requests-limit: 5
+  #   groups:
+  #     minor-and-patch:
+  #       update-types: ["minor", "patch"]

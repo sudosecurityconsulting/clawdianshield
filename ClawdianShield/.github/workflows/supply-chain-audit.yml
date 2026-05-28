@@ -1,0 +1,168 @@
+name: Supply Chain Audit
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  schedule:
+    # Nightly at 07:00 UTC — catches advisories published since last commit
+    - cron: '0 7 * * *'
+
+permissions:
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Job 1: pip-audit on every requirements file
+  # ---------------------------------------------------------------------------
+  pip-audit:
+    name: pip-audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install pip-audit
+        run: pip install pip-audit
+
+      - name: Audit requirements
+        run: |
+          # Audit hashed file with --require-hashes if present and
+          # platform-compatible. The platform gate is "are we on Windows?",
+          # not "does the file mention a Windows-only package?" — the latter
+          # is fragile if dep names change.
+          if [ -f requirements-hashed.txt ] && [ "${RUNNER_OS}" = "Windows" ]; then
+            python -m pip_audit -r requirements-hashed.txt \
+              --strict --require-hashes --progress-spinner off
+          elif [ -f requirements.txt ]; then
+            python -m pip_audit -r requirements.txt \
+              --strict --progress-spinner off
+          else
+            echo "No requirements file found; skipping."
+          fi
+
+  # ---------------------------------------------------------------------------
+  # Job 2: per-manifest ephemeral venv audit
+  # Each manifest gets its own venv. A shared venv lets a later install's pin
+  # overwrite an earlier (potentially vulnerable) one, hiding the earlier
+  # vulnerability from the final audit.
+  # ---------------------------------------------------------------------------
+  audit-installed-venv:
+    name: audit-installed-venv
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install audit tools
+        run: pip install pip-audit virtualenv
+
+      - name: Audit each manifest in its own venv
+        shell: bash
+        run: |
+          set -u  # not -e: we want to keep iterating on per-manifest failures
+
+          # List your manifests here. Adjust to match your repo layout.
+          MANIFESTS=()
+          [ -f requirements.txt ] && MANIFESTS+=("requirements.txt")
+          # Add nested project requirements if present
+          while IFS= read -r req; do
+            MANIFESTS+=("$req")
+          done < <(find . -name "requirements.txt" -not -path "./node_modules/*" \
+                          -not -path "./.venv*" -not -path "./venv/*" \
+                          -not -path "./.tox/*" 2>/dev/null | grep -v "^./requirements.txt$" || true)
+
+          FAILED=0
+          for req in "${MANIFESTS[@]}"; do
+            echo "::group::Auditing $req"
+            VENV_DIR="$(mktemp -d)/audit-venv"
+            python -m virtualenv -q "$VENV_DIR"
+            VENV_PY="$VENV_DIR/bin/python"
+            VENV_PIP="$VENV_DIR/bin/pip"
+
+            # Wheel-only first to avoid setup.py execution from sdists.
+            # Fall back to unconstrained install only if wheel-only fails
+            # (some packages have no wheel for Linux).
+            if ! "$VENV_PIP" install --quiet --only-binary :all: -r "$req" 2>/dev/null; then
+              echo "  wheel-only install failed; falling back to allow sdist"
+              "$VENV_PIP" install --quiet -r "$req" 2>/dev/null || {
+                echo "  install failed entirely for $req; skipping audit"
+                rm -rf "$VENV_DIR"
+                echo "::endgroup::"
+                continue
+              }
+            fi
+
+            if ! "$VENV_PY" -m pip_audit --strict; then
+              FAILED=1
+            fi
+            rm -rf "$VENV_DIR"
+            echo "::endgroup::"
+          done
+
+          [ "$FAILED" -eq 1 ] && exit 1 || exit 0
+
+  # ---------------------------------------------------------------------------
+  # Job 3: osv-scanner — independent DB
+  # Note the action path: this is the step action, not the reusable workflow.
+  # ---------------------------------------------------------------------------
+  osv-scanner:
+    name: osv-scanner
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google/osv-scanner-action/osv-scanner-action@v2.3.5
+        with:
+          scan-args: |-
+            -r
+            ./
+
+  # ---------------------------------------------------------------------------
+  # Job 4: detect_compromise.py — in-tree project scanner with SARIF upload
+  # ---------------------------------------------------------------------------
+  detect-compromise:
+    name: detect-compromise
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write   # required for SARIF upload to Security tab
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run detect_compromise (SARIF output)
+        id: scan
+        continue-on-error: true
+        run: |
+          if [ -f scripts/detect_compromise.py ]; then
+            python scripts/detect_compromise.py --root . --sarif detect_compromise.sarif
+          else
+            echo "scripts/detect_compromise.py not present; skipping."
+            echo '{"version":"2.1.0","runs":[]}' > detect_compromise.sarif
+          fi
+
+      - name: Upload SARIF to GitHub Security tab
+        if: hashFiles('detect_compromise.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: detect_compromise.sarif
+          category: detect_compromise
+
+      - name: Fail job on alerts
+        if: steps.scan.outcome == 'failure'
+        run: |
+          echo "detect_compromise.py exited non-zero — see SARIF in Security tab"
+          exit 1
+
+      - name: Run tests
+        if: hashFiles('tests/test_detect_compromise.py') != ''
+        run: python -m unittest tests/test_detect_compromise.py -v
