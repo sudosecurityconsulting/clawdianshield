@@ -2,6 +2,39 @@
 # Git root: d:/MasterVault/SUDO
 # All paths in this file are relative to the git root unless stated otherwise.
 
+---
+
+## ⚠️ PROJECT ISOLATION — READ FIRST ⚠️
+
+This repo is **ClawdianShield ONLY**. There are multiple active projects in this workspace:
+
+| Project | Location | Purpose |
+|---|---|---|
+| **ClawdianShield** | `claudianShield/` | Detection engineering / adversary emulation platform |
+| **Terminus Task(s)** | WSL Ubuntu: `~/totp-replay-audit/`, `~/task2/`, `~/task3/` | Snorkel Terminal Bench submissions (completely separate) |
+
+### Hard Rules to Prevent Cross-Contamination
+1. **Never reference ClawdianShield code, architecture, or domain when working on a Terminus task.** They are unrelated projects.
+2. **Never reference Terminus task code when working on ClawdianShield.** 
+3. **Each Terminus task is also isolated from every other Terminus task.** Task A's Dockerfile, oracle, and tests must never reference Task B.
+4. **When asked to work on a Terminus task, confirm the task name and path first.** Never assume which task is active.
+5. **The Terminus knowledge base lives at:** `terminus-knowledge-base.md` (this repo root) — **READ IT BEFORE STARTING ANY TERMINUS WORK.** It contains critical Harbor platform rules, mount path requirements, common failure modes, and local Docker testing procedures.
+6. **Do not pad responses or explain security basics to Kevin.** He is a cybersecurity professional and Terminus EC.
+
+### Active Terminus Tasks
+<!-- Update this list when tasks change state -->
+- [x] **Task 1 — TOTP Replay Audit** (`~/totp-replay-audit/`) — Submission `42f1a6ed`, EVALUATION_PENDING
+- [x] **Task 2 — Auth Anomaly Detection** (`~/task2/`) — Submission `6cab4d62`, EVALUATION_PENDING
+- [ ] **Task 3 — IDOR Audit** (`~/task3/`) — Locally validated, awaiting submission slot (E006 concurrency limit)
+
+### STB CLI (runs in WSL Ubuntu)
+```bash
+stb submissions list --project-id bfe79c33-8ab0-4061-9849-08d3207c9927
+stb submissions feedback <submission-id>
+```
+
+---
+
 ## Zero-Fail Pathing
 **Always operate from the git root: `d:/MasterVault/SUDO`**
 - Never assume a subdirectory as CWD. If unsure, run `git rev-parse --show-toplevel` to verify.
