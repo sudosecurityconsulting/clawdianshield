@@ -9,8 +9,8 @@
 **A detection engineering platform and adversary emulation pipeline.** A working, deterministic, zero-outbound digital crime scene engineered to produce the exact telemetry your SOC is almost certainly missing right now.
 
 > [!IMPORTANT]
-> **Status: Phase 3 (ELK SIEM Integration & Confluence AI Reporting) COMPLETE. Phase 4 NEXT.**
-> End-to-end verified: scenarios stream live telemetry from host-side observers into local Elasticsearch, displaying on our live dashboard, and generating Gemini-powered incident briefs that are automatically published to Confluence.
+> **Status: Phase 3a foundation is live.**
+> Elastic/Kibana ingest, the local SOC dashboard, Gemini briefs, and Stack Monitoring via Metricbeat are working in the lab. Splunk HEC wiring and credential-backed publishing flows remain backlog or environment-dependent.
 
 ---
 
@@ -67,13 +67,13 @@ Evaluation Plane — Score expected vs. observed, generate JSON report with blin
 scenarios/<id>.json
         │
         ▼
-runner/executor.py                    ← subprocess engine, safety gate, behavior→cmd map
+core/runner/executor.py               ← subprocess engine, safety gate, behavior→cmd map
   docker exec clawdian_victim sh -c "<cmd>"
         │                                        ┌──────────────────────────────────┐
-        │  artifacts (real)                      │  collectors/file_observer        │
-        ▼                                        │  collectors/log_observer         │
-  clawdian_victim:/tmp/ClawdianShield --bind-->  │  (host-side watchdog + tail;     │
-  clawdian_victim:/var/log             mount     │   emit JSONL via NormalizedEvent) │
+        │  artifacts (real)                      │  core/observers/file_observer   │
+        ▼                                        │  core/observers/log_observer    │
+  clawdian_victim:/tmp/ClawdianShield --bind-->  │  (host-side watchdog + tail;    │
+  clawdian_victim:/var/log             mount     │   emit JSONL via NormalizedEvent)│
                                                  └──────────────┬───────────────────┘
         │                                                       ▼
         ▼                                           evidence/file_events.jsonl
@@ -86,7 +86,7 @@ Full diagram: [`docs/architecture.puml`](docs/architecture.puml)
 
 ## The Menu of Mayhem — Scenario Catalog
 
-Ten crime scenes. All JSON. All deterministic. All embarrassing for your detection stack.
+The core hand-authored crime scenes. All JSON. All deterministic. All embarrassing for your detection stack.
 
 | ID | Name | Risk | Hosts |
 | :--- | :--- | :--- | :--- |
@@ -104,6 +104,28 @@ Ten crime scenes. All JSON. All deterministic. All embarrassing for your detecti
 The full storyline chains auth burst → remote execution artifacts → enumeration/staging → persistence-path mutation → anti-forensics → cleanup. One run, seven stages, one scorecard.
 
 ![Scenario Runs Console - Full Synthetic Intrusion Storyline execution showing AI-generated incident brief with executive summary, attack chain narrative, telemetry assessment, recommended detections, risk rating, and all 23 execution steps with OK status](docs/screenshot-scenario-runs.png)
+
+---
+
+## Atomic Red Team Import
+
+`core/runner/atomic_converter.py` converts a cloned Atomic Red Team `atomics/`
+tree into ClawdianShield scenario JSON under `scenarios/atomic/`. Linux shell
+tests become runnable scenarios; non-Linux, non-shell, elevated, or dependency-
+gated tests are still surfaced, but emitted inert so they can be reviewed
+without being executed accidentally.
+
+```bash
+# Convert one technique file to stdout
+python core/runner/atomic_converter.py \
+  --file vendor/atomic-red-team/atomics/T1070.004/T1070.004.yaml \
+  --stdout
+
+# Convert a full atomics/ tree into scenario JSON
+python core/runner/atomic_converter.py \
+  --atomics-dir vendor/atomic-red-team/atomics \
+  --out scenarios/atomic
+```
 
 ---
 
@@ -135,9 +157,12 @@ The Kill Chain visualization renders three phases — **IN** (Initial Foothold),
 
 ```bash
 # Start the console
-python -m dashboard.server --host 0.0.0.0 --port 8088
+python platform/dashboard/server.py --host 0.0.0.0 --port 8088
 # → http://localhost:8088
 ```
+
+Use the file path form here because the repo's top-level `platform/` package
+collides with Python's stdlib `platform` module.
 
 Endpoints:
 
@@ -172,28 +197,74 @@ GET /api/brief/<run_id>?model=gemini-2.5-flash
 
 ---
 
+## SIEM Forwarding — Elastic + Monitoring (Phase 3a)
+
+`platform/telemetry/forwarders/elastic_shipper.py` bulk-ingests the evidence
+JSONL stream into Elasticsearch so the same ground-truth telemetry the dashboard
+scores can be queried, pivoted, and alerted on from a real SIEM — not just the
+built-in console.
+
+For a fully populated lab, `scripts/seed_all_scenarios.py` walks every
+`scenarios/single-host/*.json`, writes fresh `evidence/*.jsonl`, emits one
+`reports/<run_id>_exec_log.json` per scenario, and then forwards the combined
+batch into Elasticsearch.
+
+Bring up the single-node Elastic stack and monitoring sidecar with:
+
+```bash
+docker compose --env-file .env -f docker/docker-compose.yml up -d \
+  elasticsearch kibana metricbeat
+```
+
+If `ELASTICSEARCH_URL=http://localhost:9200` is configured, seed and ship with:
+
+```bash
+python scripts/seed_all_scenarios.py
+```
+
+Events land with their full NormalizedEvent shape — `collector`, `event_type`,
+`details.path`, `host`, `run_id`, `scenario_id`, `severity`, `timestamp` — so
+each scenario run is fully reconstructable in Kibana Discover. The added
+`metricbeat` service also feeds `.monitoring-es-*` and `.monitoring-kibana-*`
+for Kibana Stack Monitoring.
+
+![Kibana Discover - ClawdianShield events index with shipped telemetry visible in Discover](docs/screenshot-elastic-siem.png)
+
+---
+
 ## Running It
 
 ```bash
 # 1. Spin up the victim container
-docker compose -f engine/docker/docker-compose.yml up -d clawdian_victim
+docker compose --env-file .env -f docker/docker-compose.yml up -d clawdian_victim
 
-# 2. Start host-side observers (Terminal 1)
-python -m sensors.run \
+# 2. Start the file observer (Terminal 1)
+python core/observers/file_observer.py \
+  --watch victim_state \
+  --output evidence/file_events.jsonl \
   --run-id verify-001 \
   --scenario-id fim_burst_001 \
   --host workstation-1
 
-# 3. Fire the scenario (Terminal 2)
-python engine/executor.py \
-  engine/scenarios/fim_burst_tamper.json \
-  --container clawdian_victim
+# 3. Start the auth log observer (Terminal 2)
+python core/observers/log_observer.py \
+  --watch victim_logs/auth.log \
+  --output evidence/auth_events.jsonl \
+  --run-id verify-001 \
+  --scenario-id fim_burst_001 \
+  --host workstation-1
 
-# 4. Launch the dashboard (Terminal 3)
-python -m dashboard.server --host 0.0.0.0 --port 8088
+# 4. Fire the scenario (Terminal 3)
+python core/runner/executor.py \
+  scenarios/single-host/fim_burst_tamper.json \
+  --container clawdian_victim \
+  --reports reports
+
+# 5. Launch the dashboard (Terminal 4)
+python platform/dashboard/server.py --host 0.0.0.0 --port 8088
 
 # Dry-run any scenario without Docker (validates parsing + safety gate)
-python engine/executor.py engine/scenarios/fim_burst_tamper.json --dry-run
+python core/runner/executor.py scenarios/single-host/fim_burst_tamper.json --dry-run --reports reports
 ```
 
 Two output streams land per run:
@@ -210,7 +281,7 @@ git clone https://github.com/dadopsmateomaddox/ClawdianShield.git
 cd ClawdianShield
 
 # 2. Python deps
-pip install -r ClawdianShield/requirements.txt
+pip install -r requirements.txt
 
 # 3. Node deps (Linear tooling only — skip if you don't care about issue tracking)
 npm install
@@ -218,6 +289,7 @@ npm install
 # 4. Configure secrets — never commit real values
 cp .env.example .env
 # GEMINI_API_KEY — for AI briefs
+# ELASTICSEARCH_URL=http://localhost:9200 — for Elastic seeding/shipping
 # LINEAR_API_KEY — for issue tracking (optional)
 
 # 5. Seed Linear backlog (idempotent)
@@ -231,44 +303,34 @@ npm run bootstrap-linear
 ## Repo Structure
 
 ```text
-clawdianShield/
-│
-├── [S]cenarios/        ← the crime scenes. JSON playbooks defining every
-│   └── *.json             adversary behavior, timing, and expected telemetry.
-│
-├── [U]tils/            ← shared plumbing. JSONL read/write helpers and
-│   └── *.py               nothing glamorous. The unsung heroes.
-│
-├── [D]ashboard/        ← the pane of glass. FastAPI + WebSocket SOC console,
-│   ├── server.py          Gemini AI brief engine, static SPA with UKC rings.
-│   └── static/
-│
-├── [O]bservers/        ← host-side eyes. file_observer (watchdog), log_observer
-│   └── collectors/        (tail + regex), correlation, normalizer. Real artifacts.
-│                          No in-process fabrication.
-│
-├── runner/             executor.py — deterministic subprocess engine +
-│                       safety gate + behavior→docker exec command map
-├── shared/             models.py — Pydantic v2 NormalizedEvent / RunContext schema
-├── victim/             Dockerfile.victim — minimal alpine target image
-├── victim_state/       bind-mounted to /tmp/ClawdianShield in victim (gitignored)
-├── victim_logs/        bind-mounted to /var/log in victim (gitignored)
-├── evidence/           JSONL event output from observers (gitignored)
-├── reports/            executor logs and run scorecards (gitignored, .gitkeep)
-├── intelligence/       gemini_client.py — AI brief generation via google-genai
-├── telemetry/          Splunk HEC forwarder — Phase 3 backlog
-├── detections/         detection rule stubs — Phase 3 backlog
-├── tests/              validation harness
-├── scripts/            Linear backlog bootstrap
-├── docs/               PlantUML architecture + sequence diagrams
-└── docker/             Dockerfile.runner + docker-compose.yml
+ClawdianShield/
+├── core/
+│   ├── runner/          executor.py, atomic_converter.py
+│   ├── observers/       file_observer.py, log_observer.py, run.py
+│   ├── intelligence/    gemini_client.py, confluence_publisher.py
+│   ├── evaluation/      scoring and telemetry gap analysis
+│   └── models/          NormalizedEvent / RunContext schema
+├── platform/
+│   ├── dashboard/       server.py, seed_demo.py, static/ SPA assets
+│   └── telemetry/       elastic_shipper.py, splunk_hec.py, collectors/
+├── scenarios/
+│   ├── single-host/     hand-authored scenario JSON
+│   └── atomic/          imported Atomic Red Team scenario JSON
+├── vendor/              local Atomic Red Team checkout used for conversion
+├── docker/              docker-compose.yml, Metricbeat config, images
+├── evidence/            JSONL event output (gitignored)
+├── reports/             exec logs, scores, AI briefs (gitignored)
+├── docs/                PlantUML diagrams + README screenshots
+├── tests/               validation harness
+├── scripts/             seed_all_scenarios.py and support tooling
+└── utils/               JSONL helpers
 ```
 
 ---
 
 ## Telemetry Schema
 
-All observers emit JSONL to `evidence/` using the `NormalizedEvent` schema (`shared/models.py`, Pydantic v2):
+All observers emit JSONL to `evidence/` using the `NormalizedEvent` schema (`core/models/event_schema.py`, Pydantic v2):
 
 ```json
 {
@@ -285,12 +347,12 @@ All observers emit JSONL to `evidence/` using the `NormalizedEvent` schema (`sha
 
 | Module | What It Does | Status |
 | :--- | :--- | :--- |
-| `collectors/file_observer.py` | Watchdog PollingObserver on bind-mounted victim state | live |
-| `collectors/log_observer.py` | Log tailer; regex-classifies pam_unix auth events | live |
-| `collectors/run.py` | Convenience launcher — starts both observers, shared stop event | live |
-| `collectors/correlation.py` | Cross-host adjacency from `details.source_host` | utility |
-| `collectors/normalizer.py` | Dict → NormalizedEvent boundary validator | utility |
-| `collectors/file_events.py` | sha256 snapshot/diff helpers | utility |
+| `core/observers/file_observer.py` | Watchdog PollingObserver on bind-mounted victim state | live |
+| `core/observers/log_observer.py` | Log tailer; regex-classifies pam_unix auth events | live |
+| `core/observers/run.py` | Convenience launcher — starts both observers, shared stop event | live |
+| `core/observers/correlation.py` | Cross-host adjacency from `details.source_host` | utility |
+| `core/observers/normalizer.py` | Dict → NormalizedEvent boundary validator | utility |
+| `core/observers/file_events.py` | sha256 snapshot/diff helpers | utility |
 
 ---
 
@@ -301,9 +363,10 @@ All observers emit JSONL to `evidence/` using the `NormalizedEvent` schema (`sha
 | 1 — Core Engine | Scenario executor, Docker victim, safety gate, dry-run mode | ✅ Complete |
 | 2 — SOC Dashboard | FastAPI + WebSocket console, UKC visual playback, ATT&CK map | ✅ Complete |
 | 2b — AI Intelligence | Gemini brief generation, google-genai SDK, model selector | ✅ Complete |
-| 3 — SIEM & Reporting | ELK Stack Integration (`elastic_shipper.py`), Confluence Publishing | ✅ Complete |
-| 4a — CVE Intelligence | NVD/CISA KEV feed → ATT&CK technique correlation | 📋 Backlog |
-| 4b — Scenario Expansion | Container escape, cred access, cloud metadata abuse scenarios | 📋 Backlog |
+| 3a — Telemetry | Elastic + Kibana + Metricbeat monitoring (`platform/telemetry/`) | ✅ Working |
+| 3b — Splunk | Splunk HEC forwarder and container wiring | 📋 Backlog |
+| 3c — Reporting | Confluence publishing and credential-backed workflows | 🚧 In progress |
+| 4 — Scenario Expansion | Atomic imports plus additional lab-safe scenarios | 🚧 In progress |
 
 ---
 

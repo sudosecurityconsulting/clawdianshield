@@ -20,8 +20,8 @@ Scope (v1, deliberately bounded):
   - `#{arg}` input arguments are substituted with their declared `default`.
 
 Usage:
-    python -m engine.atomic_converter --file path/to/T1070.004.yaml --stdout
-    python -m engine.atomic_converter --atomics-dir path/to/atomics --out engine/scenarios/atomic
+    python -m core.runner.atomic_converter --file path/to/T1070.004.yaml --stdout
+    python -m core.runner.atomic_converter --atomics-dir path/to/atomics --out scenarios/atomic
 """
 from __future__ import annotations
 
@@ -171,7 +171,7 @@ def main() -> None:
     src = p.add_mutually_exclusive_group(required=True)
     src.add_argument("--file", help="Single atomic technique YAML")
     src.add_argument("--atomics-dir", help="Root of a cloned atomic-red-team atomics/ tree")
-    p.add_argument("--out", default="engine/scenarios/atomic", help="Output dir for scenario JSON")
+    p.add_argument("--out", default="scenarios/atomic", help="Output dir for scenario JSON")
     p.add_argument("--stdout", action="store_true", help="Print scenarios as JSON instead of writing")
     p.add_argument("--executable-only", action="store_true", help="Skip gated (non-runnable) atomics")
     args = p.parse_args()

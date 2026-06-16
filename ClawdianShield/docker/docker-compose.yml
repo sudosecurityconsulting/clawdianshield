@@ -89,6 +89,9 @@ services:
       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
       # Disable TLS for local dev
       - xpack.security.http.ssl.enabled=false
+      # Required so Metricbeat's elasticsearch-xpack module can pull
+      # cluster, node, and index stats for Stack Monitoring.
+      - xpack.monitoring.collection.enabled=true
     ports:
       - "9200:9200"
       - "9300:9300"
@@ -102,6 +105,22 @@ services:
       timeout: 10s
       retries: 5
       start_period: 60s
+    restart: "no"
+
+  metricbeat:
+    image: docker.elastic.co/beats/metricbeat:8.11.0
+    container_name: clawdian_metricbeat
+    user: root
+    # Strict file ownership check on the mounted config; relax for bind mount.
+    command: ["--strict.perms=false", "-environment", "container"]
+    volumes:
+      - ./metricbeat.yml:/usr/share/metricbeat/metricbeat.yml:ro
+      - ./metricbeat-modules.d:/usr/share/metricbeat/modules.d:ro
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - clawdian_net
     restart: "no"
 
   kibana:

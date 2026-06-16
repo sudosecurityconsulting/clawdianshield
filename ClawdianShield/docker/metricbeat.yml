@@ -1,0 +1,18 @@
+metricbeat.config.modules:
+  path: ${path.config}/modules.d/*.yml
+  reload.enabled: false
+
+setup.kibana:
+  host: "kibana:5601"
+
+output.elasticsearch:
+  hosts: ["elasticsearch:9200"]
+
+# Ship to the canonical Stack Monitoring indices (.monitoring-es-*,
+# .monitoring-kibana-*). Without this, Kibana's Stack Monitoring UI
+# can't discover the data.
+monitoring.enabled: false
+xpack.monitoring.enabled: false
+
+logging.level: info
+logging.to_files: false

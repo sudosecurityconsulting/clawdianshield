@@ -1,0 +1,4 @@
+- module: kibana
+  xpack.enabled: true
+  period: 10s
+  hosts: ["http://kibana:5601"]

@@ -24,6 +24,7 @@ The cost of blind spots is not theoretical. An undetected lateral movement chain
 - **Scores detection coverage** across five dimensions: detection rate, telemetry completeness, correlation quality, timeliness, and analyst usefulness
 - **Maps observed behavior to MITRE ATT&CK techniques** and visualizes coverage against the Unified Kill Chain (Pols, 2017) 18-tactic model
 - **Produces AI-powered incident briefs** via Gemini 2.5 Flash — executive summary, attack chain narrative, telemetry gap assessment, and risk rating per run
+- **Seeds and ships multi-scenario lab data into Elastic** — including Kibana Discover pivots and Stack Monitoring via Metricbeat
 
 The scenarios do not ship real exploits or credential attack logic. They produce the signals defenders care about — without depending on target internals or crossing into operationally abusive territory. The point is detection coverage and telemetry quality.
 
@@ -66,17 +67,17 @@ Evaluation Plane — Score expected vs. observed, generate JSON report with blin
 
 The key design decision: observers run on the **host** (not inside the victim) watching bind-mounted directories. Real artifacts. Real reads. Zero in-process telemetry fabrication.
 
-```
+```text
 scenarios/<id>.json
         │
         ▼
-engine/executor.py                    ← subprocess engine, safety gate, behavior→cmd map
+core/runner/executor.py               ← subprocess engine, safety gate, behavior→cmd map
   docker exec clawdian_victim sh -c "<cmd>"
         │                                        ┌──────────────────────────────────┐
-        │  artifacts (real)                      │  collectors/file_observer        │
-        ▼                                        │  collectors/log_observer         │
-  clawdian_victim:/tmp/ClawdianShield --bind-->  │  (host-side watchdog + tail;     │
-  clawdian_victim:/var/log             mount     │   emit JSONL via NormalizedEvent) │
+        │  artifacts (real)                      │  core/observers/file_observer   │
+        ▼                                        │  core/observers/log_observer    │
+  clawdian_victim:/tmp/ClawdianShield --bind-->  │  (host-side watchdog + tail;    │
+  clawdian_victim:/var/log             mount     │   emit JSONL via NormalizedEvent)│
                                                  └──────────────┬───────────────────┘
         │                                                       ▼
         ▼                                           evidence/file_events.jsonl
@@ -91,25 +92,30 @@ Full PlantUML diagrams: [`ClawdianShield/docs/architecture.puml`](ClawdianShield
 
 **Requirements:** Docker Desktop 4.70+ with WSL2 backend. Python 3.11+.
 
-```bash
-# 1. Clone
-git clone https://github.com/dadopsmateomaddox/ClawdianShield.git
-cd ClawdianShield
+Run the commands below from the repository root.
 
-# 2. Install Python deps
+```bash
+# 1. Install Python deps
 pip install -r ClawdianShield/requirements.txt
 
-# 3. Configure API key for AI briefs (optional — dashboard works without it)
+# 2. Configure API key for AI briefs (optional — dashboard works without it)
 cp ClawdianShield/.env.example ClawdianShield/.env
-# Edit .env and add: GEMINI_API_KEY=your_key_here
+# Edit ClawdianShield/.env and add: GEMINI_API_KEY=your_key_here
 
-# 4. Seed demo data (no Docker required — populates dashboard immediately)
-python -m ClawdianShield.dashboard.seed_demo --reset
+# 3. Seed demo data (no Docker required — populates dashboard immediately)
+python ClawdianShield/platform/dashboard/seed_demo.py --reset
 
-# 5. Launch the dashboard
-python -m ClawdianShield.dashboard.server --host 0.0.0.0 --port 8088
+# 4. Launch the dashboard
+python ClawdianShield/platform/dashboard/server.py \
+  --host 0.0.0.0 \
+  --port 8088 \
+  --evidence-dir ClawdianShield/evidence \
+  --reports-dir ClawdianShield/reports
 # → http://localhost:8088
 ```
+
+Use direct file paths for `platform/dashboard/*` because the repo's top-level
+`platform/` package collides with Python's stdlib `platform` module.
 
 **What success looks like:** Dashboard loads with 138 ingested events, severity timeseries populated, scenario runs visible in the SCENARIO RUNS tab. Click any run and select GENERATE BRIEF to invoke Gemini.
 
@@ -117,29 +123,43 @@ To run a live scenario (requires Docker):
 
 ```bash
 # Spin up the victim container
-docker compose -f ClawdianShield/docker/docker-compose.yml up -d clawdian_victim
+docker compose --env-file ClawdianShield/.env \
+  -f ClawdianShield/docker/docker-compose.yml up -d clawdian_victim
 
-# Start observers (Terminal 1)
-python -m ClawdianShield.collectors.run \
+# Start the file observer (Terminal 1)
+python ClawdianShield/core/observers/file_observer.py \
+  --watch ClawdianShield/victim_state \
+  --output ClawdianShield/evidence/file_events.jsonl \
   --run-id verify-001 \
   --scenario-id fim_burst_001 \
   --host workstation-1
 
-# Fire the scenario (Terminal 2)
-python ClawdianShield/engine/executor.py \
-  ClawdianShield/engine/scenarios/fim_burst_tamper.json \
-  --container clawdian_victim
+# Start the auth log observer (Terminal 2)
+python ClawdianShield/core/observers/log_observer.py \
+  --watch ClawdianShield/victim_logs/auth.log \
+  --output ClawdianShield/evidence/auth_events.jsonl \
+  --run-id verify-001 \
+  --scenario-id fim_burst_001 \
+  --host workstation-1
+
+# Fire the scenario (Terminal 3)
+python ClawdianShield/core/runner/executor.py \
+  ClawdianShield/scenarios/single-host/fim_burst_tamper.json \
+  --container clawdian_victim \
+  --reports ClawdianShield/reports
 
 # Dry-run any scenario without Docker (validates parsing + safety gate)
-python ClawdianShield/engine/executor.py \
-  ClawdianShield/engine/scenarios/fim_burst_tamper.json --dry-run
+python ClawdianShield/core/runner/executor.py \
+  ClawdianShield/scenarios/single-host/fim_burst_tamper.json \
+  --dry-run \
+  --reports ClawdianShield/reports
 ```
 
 ---
 
 ## Scenario Catalog
 
-Ten deterministic crime scenes. Each produces a specific set of defender-relevant artifacts.
+The core hand-authored crime scenes. Each produces a specific set of defender-relevant artifacts.
 
 | ID | Name | Risk | Hosts | What It Tests |
 | :--- | :--- | :--- | :--- | :--- |
@@ -153,6 +173,28 @@ Ten deterministic crime scenes. Each produces a specific set of defender-relevan
 | `anti_forensics_pressure_001` | Anti-Forensics Pressure Test | Critical | 1 | Log tampering and cleanup detection |
 | `dependency_swap_001` | Dependency Swap / Supply Chain Emulation | Critical | 1 | Software supply chain signal detection |
 | `full_storyline_001` | Full Synthetic Intrusion Storyline | High | 2 | End-to-end intrusion chain — auth burst → remote exec → staging → persistence → anti-forensics → cleanup |
+
+---
+
+## Atomic Red Team Import
+
+`core/runner/atomic_converter.py` converts a cloned Atomic Red Team `atomics/`
+tree into ClawdianShield scenario JSON under `scenarios/atomic/`. Linux shell
+tests become runnable scenarios; non-Linux, non-shell, elevated, or dependency-
+gated tests are still surfaced, but emitted inert so they can be reviewed
+without being executed accidentally.
+
+```bash
+# Convert one technique file to stdout
+python ClawdianShield/core/runner/atomic_converter.py \
+  --file ClawdianShield/vendor/atomic-red-team/atomics/T1070.004/T1070.004.yaml \
+  --stdout
+
+# Convert a full atomics/ tree into scenario JSON
+python ClawdianShield/core/runner/atomic_converter.py \
+  --atomics-dir ClawdianShield/vendor/atomic-red-team/atomics \
+  --out ClawdianShield/scenarios/atomic
+```
 
 ---
 
@@ -177,6 +219,14 @@ A Kibana-style analyst console with real-time WebSocket event streaming.
 
 ![ATT&CK Map — MITRE technique coverage grid with 13 mapped techniques](ClawdianShield/docs/screenshot-attack-map.png)
 
+```bash
+python ClawdianShield/platform/dashboard/server.py \
+  --host 0.0.0.0 \
+  --port 8088 \
+  --evidence-dir ClawdianShield/evidence \
+  --reports-dir ClawdianShield/reports
+```
+
 API endpoints:
 
 | Route | Method | Description |
@@ -193,18 +243,37 @@ The server is read-only. It never mutates evidence or fires scenarios.
 
 ---
 
-## SIEM Forwarding — Elastic (Phase 3a)
+## SIEM Forwarding — Elastic + Monitoring (Phase 3a)
 
-The `telemetry/forwarders/elastic_shipper.py` shipper bulk-ingests the evidence
-JSONL stream into Elasticsearch (`ClawdianShield-events` index) so the same
-ground-truth telemetry the dashboard scores can be queried, pivoted, and
-alerted on from a real SIEM — not just the built-in console.
+`platform/telemetry/forwarders/elastic_shipper.py` bulk-ingests the evidence
+JSONL stream into Elasticsearch so the same ground-truth telemetry the dashboard
+scores can be queried, pivoted, and alerted on from a real SIEM — not just the
+built-in console.
 
-Bring up the single-node cluster with `docker compose up -d elasticsearch
-kibana`, then run the shipper against `evidence/`. Events land with their full
-NormalizedEvent shape — `collector`, `event_type`, `details.path`, `host`,
-`run_id`, `scenario_id`, `severity`, `timestamp` — so a `fim_burst_001` run is
-fully reconstructable in Kibana Discover.
+For a fully populated lab, `scripts/seed_all_scenarios.py` walks every
+`scenarios/single-host/*.json`, writes fresh `evidence/*.jsonl`, emits one
+`reports/<run_id>_exec_log.json` per scenario, and then forwards the combined
+batch into Elasticsearch.
+
+Bring up the single-node Elastic stack and monitoring sidecar with:
+
+```bash
+docker compose --env-file ClawdianShield/.env \
+  -f ClawdianShield/docker/docker-compose.yml up -d \
+  elasticsearch kibana metricbeat
+```
+
+If `ELASTICSEARCH_URL=http://localhost:9200` is configured, seed and ship with:
+
+```bash
+python ClawdianShield/scripts/seed_all_scenarios.py
+```
+
+Events land with their full NormalizedEvent shape — `collector`, `event_type`,
+`details.path`, `host`, `run_id`, `scenario_id`, `severity`, `timestamp` — so
+each scenario run is fully reconstructable in Kibana Discover. The added
+`metricbeat` service also feeds `.monitoring-es-*` and `.monitoring-kibana-*`
+for Kibana Stack Monitoring.
 
 ![Kibana Discover — ClawdianShield-events index, 164 shipped events from a fim_burst_001 run, showing per-event collector/path/severity fields and the ingest-volume timeseries](ClawdianShield/docs/screenshot-elastic-siem.png)
 
@@ -255,7 +324,7 @@ Every run is graded across five dimensions.
 
 ## Telemetry Schema
 
-All observers emit JSONL using the `NormalizedEvent` schema (`ClawdianShield/unification/models.py`, Pydantic v2):
+All observers emit JSONL using the `NormalizedEvent` schema (`ClawdianShield/core/models/event_schema.py`, Pydantic v2):
 
 ```json
 {
@@ -272,12 +341,12 @@ All observers emit JSONL using the `NormalizedEvent` schema (`ClawdianShield/uni
 
 | Module | Role | Status |
 | :--- | :--- | :--- |
-| `collectors/file_observer.py` | Watchdog PollingObserver on bind-mounted victim state | Live |
-| `collectors/log_observer.py` | Log tailer — regex-classifies pam_unix auth events | Live |
-| `collectors/run.py` | Launcher — starts both observers, shared stop event | Live |
-| `collectors/correlation.py` | Cross-host adjacency from `details.source_host` | Utility |
-| `collectors/normalizer.py` | Dict → NormalizedEvent boundary validator | Utility |
-| `collectors/file_events.py` | sha256 snapshot/diff helpers | Utility |
+| `core/observers/file_observer.py` | Watchdog PollingObserver on bind-mounted victim state | Live |
+| `core/observers/log_observer.py` | Log tailer — regex-classifies pam_unix auth events | Live |
+| `core/observers/run.py` | Launcher — starts both observers, shared stop event | Live |
+| `core/observers/correlation.py` | Cross-host adjacency from `details.source_host` | Utility |
+| `core/observers/normalizer.py` | Dict → NormalizedEvent boundary validator | Utility |
+| `core/observers/file_events.py` | sha256 snapshot/diff helpers | Utility |
 
 ---
 
@@ -288,33 +357,37 @@ All observers emit JSONL using the `NormalizedEvent` schema (`ClawdianShield/uni
 | 1 — Core Engine | Scenario executor, Docker victim, safety gate, dry-run mode | Complete |
 | 2 — SOC Dashboard | FastAPI + WebSocket console, UKC visualization, ATT&CK map | Complete |
 | 2b — AI Intelligence | Gemini brief generation, model selector, cached reports | Complete |
-| 3a — Telemetry | Elastic shipper (`telemetry/forwarders/elastic_shipper.py`) — JSONL → Elasticsearch + Kibana | Working (live-verified) |
-| 3a — Telemetry | Splunk HEC forwarder (`ClawdianShield/telemetry/`) | Backlog |
-| 3b — CVE Intelligence | NVD/CISA KEV feed mapped to observed ATT&CK techniques | Backlog |
-| 3c — Scenario Expansion | Container escape, credential access, cloud metadata abuse | Backlog |
+| 3a — Telemetry | Elastic + Kibana + Metricbeat monitoring (`platform/telemetry/`) | Working (live-verified) |
+| 3b — Splunk | Splunk HEC forwarder and container wiring | Backlog |
+| 3c — Reporting | Confluence publishing and credential-backed workflows | In progress |
+| 4 — Scenario Expansion | Atomic imports plus additional lab-safe scenarios | In progress |
 
 ---
 
 ## Repo Structure
 
-```
+```text
 ClawdianShield/
-├── runner/          executor.py — deterministic subprocess scenario engine + safety gate
-├── collectors/      file_observer, log_observer, run (host-side streaming observers)
-├── shared/          models.py — Pydantic v2 NormalizedEvent / RunContext schema
-├── victim/          Dockerfile.victim — minimal Alpine target image
-├── scenarios/       10 JSON scenario definitions
-├── dashboard/       server.py — FastAPI + WebSocket + REST; static/ — SPA frontend
-├── intelligence/    gemini_client.py — Gemini AI brief generation
-├── telemetry/       Splunk HEC forwarder (Phase 3a backlog)
-├── detections/      Detection rule stubs (Phase 3 backlog)
-├── evidence/        JSONL event output (gitignored)
-├── reports/         Exec logs and run scorecards (gitignored, .gitkeep)
-├── tests/           Validation harness
-├── utils/           JSONL read/write helpers
-├── scripts/         Linear backlog bootstrap
-├── docs/            PlantUML architecture + sequence diagrams + screenshots
-└── docker/          Dockerfile.runner + docker-compose.yml
+├── core/
+│   ├── runner/          executor.py, atomic_converter.py
+│   ├── observers/       file_observer.py, log_observer.py, run.py
+│   ├── intelligence/    gemini_client.py, confluence_publisher.py
+│   ├── evaluation/      scoring and telemetry gap analysis
+│   └── models/          NormalizedEvent / RunContext schema
+├── platform/
+│   ├── dashboard/       server.py, seed_demo.py, static/ SPA assets
+│   └── telemetry/       elastic_shipper.py, splunk_hec.py, collectors/
+├── scenarios/
+│   ├── single-host/     hand-authored scenario JSON
+│   └── atomic/          imported Atomic Red Team scenario JSON
+├── vendor/              local Atomic Red Team checkout used for conversion
+├── docker/              docker-compose.yml, Metricbeat config, images
+├── evidence/            JSONL event output (gitignored)
+├── reports/             exec logs, scores, AI briefs (gitignored)
+├── docs/                PlantUML diagrams + README screenshots
+├── tests/               validation harness
+├── scripts/             seed_all_scenarios.py and support tooling
+└── utils/               JSONL helpers
 ```
 
 ---
