@@ -84,7 +84,8 @@ core/runner/executor.py               ← subprocess engine, safety gate, behavi
 reports/<run_id>_exec_log.json                      evidence/auth_events.jsonl
 ```
 
-Full PlantUML diagrams: [`ClawdianShield/docs/architecture.puml`](ClawdianShield/docs/architecture.puml)
+Full component map, Mermaid data-flow diagram, and API reference: [`ClawdianShield/docs/ARCHITECTURE.md`](ClawdianShield/docs/ARCHITECTURE.md)
+PlantUML sequence diagrams: [`ClawdianShield/docs/architecture.puml`](ClawdianShield/docs/architecture.puml)
 
 ---
 
