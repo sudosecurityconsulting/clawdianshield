@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-This project is currently under **_active development_**. Security updates are only guaranteed for the**latest version**.
+This project is currently under **_active development_**. Security updates are only guaranteed for the **latest version**.
 
 | Version | Supported          |
 | ------- | ------------------ |
