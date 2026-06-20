@@ -1,0 +1,79 @@
+ClawdianShield - Comprehensive Feature List & Roadmap
+
+=======================================================
+CURRENT FEATURES
+=======================================================
+
+1. Synthetic Telemetry Generation
+   - Generates authentic, ground-truth host-side telemetry (file tampering, auth anomalies, staging, persistence writes, anti-forensics sequences).
+   - Uses real Docker exec commands fired at a controlled victim container.
+   - Induces real state changes without fabricating telemetry signals.
+
+2. Detection Validation & Scoring Model
+   - Scores detection coverage across five dimensions: Detection Coverage (30%), Telemetry Completeness (25%), Correlation Quality (20%), Timeliness (15%), and Analyst Usefulness (10%).
+   - Generates scorecards (JSON) per execution run.
+
+3. MITRE ATT&CK & UKC Mapping
+   - Maps executed behaviors to specific MITRE ATT&CK techniques.
+   - Visualizes telemetry coverage against the Unified Kill Chain (UKC) 18-tactic model.
+   - Renders detection state directly onto a visual 3-ring UKC display (IN, THROUGH, OUT).
+
+4. AI-Powered Incident Briefs (Gemini Integration)
+   - Uses Gemini 2.5 Flash to automatically generate a SOC-grade incident brief per run.
+   - Includes executive summaries, attack chain narratives, telemetry gap assessments, and recommended detections.
+
+5. Telemetry Observation & Normalization
+   - Host-side file and log polling observers (watches bind-mounted directories).
+   - Validates and emits events using a strict Pydantic v2 NormalizedEvent JSONL schema.
+   - Zero in-process telemetry fabrication.
+
+6. Deterministic Execution Control Plane
+   - Parses JSON scenario definitions.
+   - Validates safety constraints and limits before launching an attack plan.
+   - Supports dry-run execution and safe environment teardown/cleanup.
+
+7. Interactive SOC Dashboard
+   - FastAPI-driven backend with a Vanilla JS Single Page Application (SPA).
+   - Real-time WebSocket event streaming.
+   - Kibana-style analyst console with severity timeseries, event type distribution, top mutated paths, and live feeds.
+   - Integrated Light/Dark theme capabilities.
+
+8. SIEM Forwarding & Exporting
+   - Built-in Elastic Shipper bulk-ingests JSONL evidence streams into Elasticsearch.
+   - Fully reconstructable events viewable within Kibana Discover.
+
+9. Built-in Scenario Catalog
+   - 10 deterministic crime scene scenarios included out of the box (e.g., FIM Burst Tamper Storm, Synthetic Multi-Host Auth Abuse, Persistence Path Mutation, Anti-Forensics Pressure Test, Dependency Swap).
+
+10. Atomic Red Team & Shai-Hulud Integration
+   - Automated conversion and orchestration of Atomic Red Team tests into ClawdianShield scenarios.
+   - Pre-commit hooks, auditing, and threat detection via integrated Shai-Hulud supply chain auditing scripts.
+
+11. Advanced Mapping
+   - NIST 800-53 RMF mapping to cross-reference MITRE behaviors with established NIST control families.
+
+=======================================================
+PLANNED FEATURES & BACKLOG
+=======================================================
+
+1. Additional SIEM Integrations (Phase 3a)
+   - Complete and enable the Splunk HTTP Event Collector (HEC) forwarder to push telemetry directly to Splunk environments.
+
+2. CVE Intelligence Feed (Phase 3b)
+   - Correlate scenario behaviors and artifacts directly with NVD / CISA KEV (Known Exploited Vulnerabilities) feeds.
+   - Map CVE attributes directly to observed ATT&CK techniques.
+
+3. Scenario Expansion (Phase 3c)
+   - Container Escape emulation sequences.
+   - Expanded Credential Access and memory scraping patterns.
+   - Cloud Metadata Abuse (AWS IMDS / Azure Instance Metadata exploitation paths).
+
+4. Detection Rules Hub
+   - Publish structured detection rule stubs (Sigma, KQL, SPL) directly tied to ClawdianShield telemetry outputs for easy import into SOC SIEMs.
+
+5. Rewind UI Interface
+   - A visual, timeline-based interactive playback mechanism to step backward and forward through a scenario run's artifact timeline.
+
+6. Enhanced Environment Integration
+   - Deeper support for Kubernetes environments (based on existing scaffolded manifests).
+   - Windows Sandbox automated provisioning for isolated payload testing.

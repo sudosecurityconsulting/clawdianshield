@@ -29,3 +29,14 @@ __pycache__/
 # OS / editor noise
 .DS_Store
 Thumbs.db
+
+# archive/ — large binaries and sensitive reference files stay out of git
+archive/*.zip
+archive/*.tar.gz
+archive/*.jpg
+archive/*.png
+archive/*.txt
+archive/*.html
+archive/SESSION_SUMMARY_*
+# Allow archive/README.md
+!archive/README.md
