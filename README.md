@@ -25,6 +25,7 @@ The cost of blind spots is not theoretical. An undetected lateral movement chain
 - **Maps observed behavior to MITRE ATT&CK techniques** and visualizes coverage against the Unified Kill Chain (Pols, 2017) 18-tactic model
 - **Produces AI-powered incident briefs** via Gemini 2.5 Flash — executive summary, attack chain narrative, telemetry gap assessment, and risk rating per run
 - **Seeds and ships multi-scenario lab data into Elastic** — including Kibana Discover pivots and Stack Monitoring via Metricbeat
+- **Benchmarks any SIEM/EDR agent** — drop a detection agent into the victim container, fire a scenario, and get a TP/FN/FP scorecard with per-technique latency (`platform/eval/`)
 
 The scenarios do not ship real exploits or credential attack logic. They produce the signals defenders care about — without depending on target internals or crossing into operationally abusive territory. The point is detection coverage and telemetry quality.
 
@@ -58,11 +59,12 @@ When `fim_burst_tamper.json` fires, the execution plane induces real state chang
 
 Four planes. Each with a distinct responsibility.
 
-```
+```text
 Control Plane    — Load scenario JSON → validate safety constraints → build attack plan
 Execution Plane  — Translate behaviors → docker exec commands → fire at victim container
 Telemetry Plane  — Host-side observers stream JSONL evidence from bind-mounted state
 Evaluation Plane — Score expected vs. observed, generate JSON report with blind spots
+Benchmark Plane  — Drop any SIEM/EDR agent into the victim, compare its alerts to ground truth
 ```
 
 The key design decision: observers run on the **host** (not inside the victim) watching bind-mounted directories. Real artifacts. Real reads. Zero in-process telemetry fabrication.

@@ -24,6 +24,7 @@
     <a data-tab="runs">Scenario Runs</a>
     <a data-tab="attack">ATT&amp;CK Map</a>
     <a data-tab="builder">Scenario Builder</a>
+    <a data-tab="benchmark">Agent Benchmark</a>
   </nav>
   <div class="status-cluster">
     <button id="theme-toggle" class="btn" style="padding: 4px 8px; font-size: 10px;">THEME</button>
@@ -246,6 +247,55 @@
   "behaviors": []
 }
         </textarea>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== AGENT BENCHMARK ===================== -->
+  <section class="tab hidden" id="tab-benchmark">
+    <div class="kpi-row">
+      <div class="kpi" id="bm-kpi-rate"><div class="kpi-label">DETECTION RATE</div><div class="kpi-value" id="bm-rate">—</div><div class="kpi-foot">TP / scored steps</div></div>
+      <div class="kpi ok"><div class="kpi-label">TRUE POSITIVES</div><div class="kpi-value" id="bm-tp">—</div><div class="kpi-foot">caught</div></div>
+      <div class="kpi crit"><div class="kpi-label">FALSE NEGATIVES</div><div class="kpi-value" id="bm-fn">—</div><div class="kpi-foot">missed</div></div>
+      <div class="kpi high"><div class="kpi-label">FALSE POSITIVES</div><div class="kpi-value" id="bm-fp">—</div><div class="kpi-foot">noise</div></div>
+      <div class="kpi"><div class="kpi-label">AVG LATENCY</div><div class="kpi-value" id="bm-latency">—</div><div class="kpi-foot">seconds to detect</div></div>
+      <div class="kpi"><div class="kpi-label">AGENT</div><div class="kpi-value" id="bm-agent" style="font-size:13px;">—</div><div class="kpi-foot">agent under test</div></div>
+    </div>
+
+    <div class="grid-2c">
+      <div class="panel">
+        <div class="panel-head"><span>BENCHMARK RUNS</span><span class="panel-sub">reports/*_benchmark.json</span></div>
+        <table class="data-table" id="tbl-benchmarks">
+          <thead><tr><th>run_id</th><th>agent</th><th>rate</th><th>TP</th><th>FN</th><th>FP</th><th>scored at</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><span>STEP-BY-STEP VERDICTS</span><span class="panel-sub" id="bm-detail-meta">select a benchmark run</span></div>
+        <div class="panel-body" id="bm-step-detail">
+          <div class="empty-hint">Select a benchmark run from the list to see per-technique detection verdicts.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" id="bm-fp-panel" style="display:none;">
+      <div class="panel-head"><span>FALSE POSITIVE ALERTS</span><span class="panel-sub">agent fired, no matching step</span></div>
+      <table class="data-table" id="tbl-bm-fps">
+        <thead><tr><th>timestamp</th><th>technique_id</th><th>rule_name</th><th>severity</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><span>HOW TO USE</span><span class="panel-sub">drop an agent in, run a scenario, benchmark it</span></div>
+      <div class="panel-body" style="font-family: var(--mono); font-size: 12px; line-height: 1.8; color: var(--text-dim);">
+        <p><strong style="color:var(--text);">1. Drop the agent into the victim container</strong></p>
+        <pre style="background:var(--bg-elev-2);padding:10px;border-radius:4px;overflow-x:auto;">python -m platform.eval.drop_agent --binary ./my_agent --start-cmd "/opt/clawdian_agent/my_agent --out /var/log/agent_alerts.jsonl" --container clawdian_victim</pre>
+        <p><strong style="color:var(--text);">2. Run a scenario</strong></p>
+        <pre style="background:var(--bg-elev-2);padding:10px;border-radius:4px;overflow-x:auto;">python -m core.runner.executor scenarios/atomic/T1070_004_*.json</pre>
+        <p><strong style="color:var(--text);">3. Score the benchmark</strong></p>
+        <pre style="background:var(--bg-elev-2);padding:10px;border-radius:4px;overflow-x:auto;">python -m platform.eval.benchmark reports/&lt;run_id&gt;_exec_log.json --agent-name "my-agent"</pre>
+        <p style="color:var(--text-dim);font-size:11px;">Agent constraints: victim container runs with <code>network_mode: none</code> and <code>cap_drop: ALL</code>. Use self-contained, file-writing agents. Commercial EDRs requiring network callbacks need the sidecar tier (see docs).</p>
       </div>
     </div>
   </section>

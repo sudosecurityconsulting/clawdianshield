@@ -16,6 +16,11 @@
   --ok: #54b399;
   --grid: #1c2330;
   --mono: ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, Consolas, monospace;
+  /* severity aliases used by benchmark renderers */
+  --sev-low: var(--ok);
+  --sev-med: var(--warn);
+  --sev-high: var(--high);
+  --sev-crit: var(--crit);
 }
 
 * { box-sizing: border-box; }
@@ -239,6 +244,7 @@ main {
   color: var(--text);
 }
 .data-table tbody tr:hover { background: #161d27; }
+.row-selected { background: var(--bg-elev-2) !important; outline: 1px solid var(--accent); }
 .data-table .num { text-align: right; }
 .data-table tbody td.num {
   color: var(--accent);

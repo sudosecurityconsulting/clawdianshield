@@ -174,6 +174,8 @@ Endpoints:
 | `/api/events?limit=N` | GET | Last-N buffered NormalizedEvents |
 | `/api/attack-map` | GET | MITRE ATT&CK technique mapping per behavior |
 | `/api/brief/<run_id>` | GET | Gemini AI incident brief for a completed run |
+| `/api/benchmarks` | GET | All agent benchmark results |
+| `/api/runs/{run_id}/benchmark` | GET | Benchmark result for a specific run |
 | `/ws` | WebSocket | Live event push — snapshot on connect, then per-event frames |
 
 The server is read-only. It never mutates evidence or fires scenarios. It just tells you what happened.
@@ -194,6 +196,60 @@ GEMINI_API_KEY=your_key_here
 # or hit the endpoint directly:
 GET /api/brief/<run_id>?model=gemini-2.5-flash
 ```
+
+---
+
+## Agent Benchmark — Drop Any SIEM/EDR In and Score It
+
+ClawdianShield can test your detection agent against real adversary telemetry and return a brutally honest scorecard. The victim container runs inside Docker; drop in any self-contained, file-writing agent, fire a scenario, and see exactly what it caught and what it missed.
+
+```text
+clawdian_victim (Docker, network=none)
+  ├── attack scenarios fire via executor.py
+  ├── agent-under-test binary runs alongside
+  └── /var/log/agent_alerts.jsonl ─bind─mount──► victim_logs/ on host
+                                                        │
+                                              platform/eval/file_drain.py
+                                                        │
+                                              platform/eval/benchmark.py
+                                                        │
+                                          reports/<run_id>_benchmark.json
+                                                        │
+                                            Dashboard → Agent Benchmark tab
+```
+
+**Three steps:**
+
+```bash
+# 1. Drop the agent into the running victim container
+python -m platform.eval.drop_agent \
+    --binary ./my_agent \
+    --start-cmd "/opt/clawdian_agent/my_agent --out /var/log/agent_alerts.jsonl" \
+    --container clawdian_victim
+
+# 2. Run a scenario as normal
+python core/runner/executor.py scenarios/atomic/T1070_004_file_deletion.json \
+    --container clawdian_victim
+
+# 3. Score it
+python -m platform.eval.benchmark reports/<run_id>_exec_log.json \
+    --agent-name "my-agent"
+```
+
+The benchmark scores each executed technique step:
+
+| Result | Meaning |
+| :--- | :--- |
+| **Detected (TP)** | Agent fired an alert matching the technique within 30 seconds of execution |
+| **Missed (FN)** | Technique ran, agent was silent |
+| **False Positive (FP)** | Agent fired, but no matching technique ran in the step set |
+| **Unscored** | Step has no ATT&CK technique label (pre-atomic hand-authored scenarios) |
+
+Technique matching is prefix-tolerant: an alert for `T1070` counts as a hit for `T1070.004`. Results surface in the **Agent Benchmark** tab of the SOC dashboard and in `reports/<run_id>_benchmark.json`.
+
+**Tier constraints:** the victim runs with `network_mode: none` and `cap_drop: ALL`. Self-contained, file-writing agents work out of the box. Commercial EDRs that phone home to a manager need the sidecar tier — a second container running the manager on an isolated Docker network (`platform/eval/` is designed for this; see the `docker/` directory for the compose extension pattern).
+
+**Test fixture:** `platform/eval/fake_agent.sh` is a shell script that mimics an EDR by writing synthetic alerts to the output path. Use it to validate the scoring pipeline before wiring a real agent.
 
 ---
 
@@ -312,6 +368,7 @@ ClawdianShield/
 │   └── models/          NormalizedEvent / RunContext schema
 ├── platform/
 │   ├── dashboard/       server.py, seed_demo.py, static/ SPA assets
+│   ├── eval/            drop_agent.py, benchmark.py, adapters/, fake_agent.sh
 │   └── telemetry/       elastic_shipper.py, splunk_hec.py, collectors/
 ├── scenarios/
 │   ├── single-host/     hand-authored scenario JSON
@@ -367,6 +424,7 @@ All observers emit JSONL to `evidence/` using the `NormalizedEvent` schema (`cor
 | 3b — Splunk | Splunk HEC forwarder and container wiring | 📋 Backlog |
 | 3c — Reporting | Confluence publishing and credential-backed workflows | 🚧 In progress |
 | 4 — Scenario Expansion | Atomic imports plus additional lab-safe scenarios | 🚧 In progress |
+| 5 — Agent Benchmark | Drop-in SIEM/EDR evaluation harness (`platform/eval/`) | ✅ Complete |
 
 ---
 

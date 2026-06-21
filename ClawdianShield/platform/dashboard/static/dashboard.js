@@ -23,6 +23,8 @@ const STATE = {
   paused: false,
   ingestBucket: { ts: Math.floor(Date.now() / 1000), count: 0 },
   ingestRate: 0,
+  benchmarks: [],
+  selectedBenchmarkId: null,
 };
 
 const charts = {};
@@ -35,12 +37,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   bindTabs();
   bindFilters();
   startClock();
-  await Promise.all([loadStats(), loadRuns(), loadAttackMap()]);
+  await Promise.all([loadStats(), loadRuns(), loadAttackMap(), loadBenchmarks()]);
   initCharts();
   renderAll();
   connectWebSocket();
   setInterval(refreshStats, 5000);
   setInterval(updateIngestRate, 1000);
+  setInterval(async () => { await loadBenchmarks(); renderBenchmarkList(); }, 15000);
 });
 
 function bindTabs() {
@@ -99,6 +102,11 @@ async function loadRuns() {
 async function loadAttackMap() {
   const r = await fetch("/api/attack-map");
   STATE.attackMap = await r.json();
+}
+
+async function loadBenchmarks() {
+  const r = await fetch("/api/benchmarks");
+  STATE.benchmarks = await r.json();
 }
 
 async function refreshStats() {
@@ -245,6 +253,7 @@ function renderAll() {
   renderEventStream();
   renderAttackMap();
   renderActiveAttack();
+  renderBenchmarkList();
 }
 
 function renderKPIs() {
@@ -1002,6 +1011,103 @@ function renderActiveAttack() {
       <span style="flex:1">${escapeHtml(t.name)}</span>
       <span class="behavior">${escapeHtml(t.behavior || "")}</span>
     </div>`).join("");
+}
+
+// ---------------------------------------------------------------------
+// Benchmark renderers
+// ---------------------------------------------------------------------
+
+function renderBenchmarkList() {
+  const tbody = document.querySelector("#tbl-benchmarks tbody");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+  if (!STATE.benchmarks.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-hint">No benchmark runs yet. Run the benchmark scorer after a scenario execution.</td></tr>';
+    return;
+  }
+  STATE.benchmarks.forEach((b) => {
+    const tr = document.createElement("tr");
+    tr.style.cursor = "pointer";
+    if (b.run_id === STATE.selectedBenchmarkId) tr.classList.add("row-selected");
+    const rateColor = b.detection_rate_pct >= 80 ? "var(--sev-low)" : b.detection_rate_pct >= 50 ? "var(--sev-med)" : "var(--sev-crit)";
+    tr.innerHTML = `
+      <td class="mono">${b.run_id}</td>
+      <td>${b.agent_name || "—"}</td>
+      <td style="color:${rateColor};font-weight:600;">${b.detection_rate_pct ?? "—"}%</td>
+      <td style="color:var(--sev-low);">${b.true_positives ?? "—"}</td>
+      <td style="color:var(--sev-crit);">${b.false_negatives ?? "—"}</td>
+      <td style="color:var(--sev-high);">${b.false_positives ?? "—"}</td>
+      <td class="ts">${(b.scored_at || "").substring(0, 19).replace("T", " ")}</td>
+    `;
+    tr.addEventListener("click", () => {
+      STATE.selectedBenchmarkId = b.run_id;
+      renderBenchmarkDetail(b);
+      renderBenchmarkList();
+    });
+    tbody.appendChild(tr);
+  });
+}
+
+function renderBenchmarkDetail(b) {
+  // KPI row
+  const rateColor = b.detection_rate_pct >= 80 ? "var(--sev-low)" : b.detection_rate_pct >= 50 ? "var(--sev-med)" : "var(--sev-crit)";
+  document.getElementById("bm-rate").textContent = `${b.detection_rate_pct ?? "—"}%`;
+  document.getElementById("bm-rate").style.color = rateColor;
+  document.getElementById("bm-tp").textContent = b.true_positives ?? "—";
+  document.getElementById("bm-fn").textContent = b.false_negatives ?? "—";
+  document.getElementById("bm-fp").textContent = b.false_positives ?? "—";
+  document.getElementById("bm-latency").textContent = b.avg_latency_s != null ? `${b.avg_latency_s}s` : "—";
+  document.getElementById("bm-agent").textContent = b.agent_name || "—";
+
+  // Per-step verdicts
+  const meta = document.getElementById("bm-detail-meta");
+  const detail = document.getElementById("bm-step-detail");
+  meta.textContent = b.run_id;
+  detail.innerHTML = "";
+
+  const steps = (b.per_step || []).filter(s => s.result !== "unscored");
+  if (!steps.length) {
+    detail.innerHTML = '<div class="empty-hint">No scoreable steps (all steps lack technique_id labels).</div>';
+  } else {
+    const table = document.createElement("table");
+    table.className = "data-table";
+    table.innerHTML = `<thead><tr><th>step</th><th>behavior</th><th>technique</th><th>verdict</th><th>latency</th></tr></thead>`;
+    const tbody = document.createElement("tbody");
+    steps.forEach(s => {
+      const tr = document.createElement("tr");
+      const verdictColor = s.result === "detected" ? "var(--sev-low)" : "var(--sev-crit)";
+      tr.innerHTML = `
+        <td class="mono">${s.step_id}</td>
+        <td>${s.behavior}</td>
+        <td class="mono">${s.technique_id || "—"}</td>
+        <td style="color:${verdictColor};font-weight:600;">${s.result.toUpperCase()}</td>
+        <td>${s.latency_s != null ? s.latency_s + "s" : "—"}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    detail.appendChild(table);
+  }
+
+  // FP panel
+  const fpPanel = document.getElementById("bm-fp-panel");
+  const fpTbody = document.querySelector("#tbl-bm-fps tbody");
+  if (b.false_positive_alerts && b.false_positive_alerts.length) {
+    fpPanel.style.display = "";
+    fpTbody.innerHTML = "";
+    b.false_positive_alerts.forEach(a => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td class="ts">${(a.timestamp || "").substring(0, 19).replace("T", " ")}</td>
+        <td class="mono">${a.technique_id || "—"}</td>
+        <td>${a.rule_name || "—"}</td>
+        <td>${a.severity || "—"}</td>
+      `;
+      fpTbody.appendChild(tr);
+    });
+  } else {
+    fpPanel.style.display = "none";
+  }
 }
 
 // ---------------------------------------------------------------------

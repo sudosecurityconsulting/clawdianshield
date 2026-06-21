@@ -279,6 +279,17 @@ def _aggregate(events: list[dict[str, Any]], runs: list[dict[str, Any]]) -> dict
     }
 
 
+def _load_benchmarks(reports_dir: Path) -> list[dict[str, Any]]:
+    """Load all *_benchmark.json files from reports/, newest first."""
+    results = []
+    for path in sorted(reports_dir.glob("*_benchmark.json"), reverse=True):
+        try:
+            results.append(json.loads(path.read_text(encoding="utf-8")))
+        except (OSError, json.JSONDecodeError):
+            continue
+    return results
+
+
 def build_app(evidence_dir: Path, reports_dir: Path) -> FastAPI:
     app = FastAPI(title="ClawdianShield SOC Console", version="3.1.0")
     static_dir = Path(__file__).parent / "static"
@@ -326,6 +337,17 @@ def build_app(evidence_dir: Path, reports_dir: Path) -> FastAPI:
     @app.get("/api/attack-map")
     async def attack_map() -> JSONResponse:
         return JSONResponse(ATTACK_MAP)
+
+    @app.get("/api/benchmarks")
+    async def benchmarks() -> JSONResponse:
+        return JSONResponse(_load_benchmarks(reports_dir))
+
+    @app.get("/api/runs/{run_id}/benchmark")
+    async def run_benchmark(run_id: str) -> JSONResponse:
+        path = reports_dir / f"{run_id}_benchmark.json"
+        if not path.exists():
+            raise HTTPException(status_code=404, detail="no benchmark for this run")
+        return JSONResponse(json.loads(path.read_text(encoding="utf-8")))
 
     def _resolve_run(run_id: str) -> dict[str, Any]:
         for r in _load_runs(reports_dir):
