@@ -78,7 +78,9 @@ Benchmark results land in `reports/<run_id>_benchmark.json` and surface in the *
 - Phase 2 — Dashboard + UKC visualization: **COMPLETE**
 - Phase 2b — Gemini AI briefs: **COMPLETE**
 - Phase 3 — Splunk HEC telemetry: **BACKLOG** (`ClawdianShield/telemetry/` scaffolded, not wired)
+- Phase 4 — Scenario Expansion: **IN PROGRESS** — 12 new lab-safe scenarios (credential_hunting, lateral_movement, container_escape, ransomware_sim, web_shell, process_injection, etc.); full Atomic Red Team library in `scenarios/atomic/`; expand to 50+ hand-authored scenarios covering all MITRE kill-chain stages (Phase 3 backlog)
 - Phase 5 — Agent Benchmark: **COMPLETE** (`platform/eval/`)
+- Phase 6 — AI Red-Teaming (PyRIT): **COMPLETE** — AI Attacks tab in dashboard reads `evidence/ai_events.jsonl`; PyRIT targets `/brief` endpoint to test LLM analyst poisoning; expand PyRIT coverage to all ATLAS tactics (Phase 3 backlog)
 
 ## Rewind UI (Planned — Not Yet Built)
 

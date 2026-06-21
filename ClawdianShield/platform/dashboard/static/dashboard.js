@@ -25,6 +25,8 @@ const STATE = {
   ingestRate: 0,
   benchmarks: [],
   selectedBenchmarkId: null,
+  aiAttacks: [],
+  aiStats: {},
 };
 
 const charts = {};
@@ -37,13 +39,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   bindTabs();
   bindFilters();
   startClock();
-  await Promise.all([loadStats(), loadRuns(), loadAttackMap(), loadBenchmarks()]);
+  await Promise.all([loadStats(), loadRuns(), loadAttackMap(), loadBenchmarks(), loadAiAttacks()]);
   initCharts();
   renderAll();
   connectWebSocket();
   setInterval(refreshStats, 5000);
   setInterval(updateIngestRate, 1000);
   setInterval(async () => { await loadBenchmarks(); renderBenchmarkList(); }, 15000);
+  setInterval(async () => { await loadAiAttacks(); renderAiAttacks(); }, 20000);
 });
 
 function bindTabs() {
@@ -107,6 +110,15 @@ async function loadAttackMap() {
 async function loadBenchmarks() {
   const r = await fetch("/api/benchmarks");
   STATE.benchmarks = await r.json();
+}
+
+async function loadAiAttacks() {
+  const [r1, r2] = await Promise.all([
+    fetch("/api/ai-attacks"),
+    fetch("/api/ai-attacks/stats"),
+  ]);
+  STATE.aiAttacks = await r1.json();
+  STATE.aiStats = await r2.json();
 }
 
 async function refreshStats() {
@@ -254,6 +266,7 @@ function renderAll() {
   renderAttackMap();
   renderActiveAttack();
   renderBenchmarkList();
+  renderAiAttacks();
 }
 
 function renderKPIs() {
@@ -1108,6 +1121,90 @@ function renderBenchmarkDetail(b) {
   } else {
     fpPanel.style.display = "none";
   }
+}
+
+// ---------------------------------------------------------------------
+// AI Attacks renderers
+// ---------------------------------------------------------------------
+
+function renderAiAttacks() {
+  const stats = STATE.aiStats || {};
+  const attacks = STATE.aiAttacks || [];
+
+  document.getElementById("ai-total").textContent = stats.total ?? "—";
+  document.getElementById("ai-success").textContent = stats.successes ?? "—";
+  document.getElementById("ai-rate").textContent = stats.total ? `${stats.success_rate_pct}%` : "—";
+  document.getElementById("ai-techniques").textContent = Object.keys(stats.by_technique || {}).length || "—";
+  const targets = [...new Set(attacks.map(a => a.target).filter(Boolean))];
+  document.getElementById("ai-target").textContent = targets[0] || "—";
+
+  const noData = document.getElementById("ai-no-data");
+  const dataView = document.getElementById("ai-data-view");
+  if (!attacks.length) {
+    noData.style.display = "";
+    dataView.style.display = "none";
+    return;
+  }
+  noData.style.display = "none";
+  dataView.style.display = "";
+
+  // Attack log table
+  const tbody = document.querySelector("#tbl-ai-attacks tbody");
+  tbody.innerHTML = "";
+  [...attacks].reverse().slice(0, 100).forEach(a => {
+    const tr = document.createElement("tr");
+    tr.style.cursor = "pointer";
+    const ok = (a.score || {}).jailbreak_success;
+    const scoreVal = (a.score || {}).score_value ?? "—";
+    tr.innerHTML = `
+      <td class="ts">${(a.timestamp || "").substring(0, 19).replace("T", " ")}</td>
+      <td class="mono">${a.atlas_technique || "—"}</td>
+      <td>${a.scenario || "—"}</td>
+      <td style="color:${ok ? "var(--sev-crit)" : "var(--sev-low)"};font-weight:600;">${ok ? "BYPASSED" : "BLOCKED"}</td>
+      <td>${scoreVal}</td>
+    `;
+    tr.addEventListener("click", () => showAiDetail(a));
+    tbody.appendChild(tr);
+  });
+
+  // ATLAS chart
+  const byTech = stats.by_technique || {};
+  const labels = Object.keys(byTech);
+  const values = Object.values(byTech);
+  if (charts.atlasChart) charts.atlasChart.destroy();
+  if (labels.length) {
+    const ctx = document.getElementById("chart-atlas-techniques").getContext("2d");
+    charts.atlasChart = new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels,
+        datasets: [{ label: "attempts", data: values, backgroundColor: "rgba(255,59,48,0.7)", borderColor: "#ff3b30", borderWidth: 1 }],
+      },
+      options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: "#8b939e", font: { size: 10 } } }, y: { ticks: { color: "#8b939e" }, beginAtZero: true } } },
+    });
+  }
+}
+
+function showAiDetail(a) {
+  const panel = document.getElementById("ai-detail-panel");
+  const meta = document.getElementById("ai-detail-meta");
+  const body = document.getElementById("ai-detail-body");
+  panel.style.display = "";
+  meta.textContent = `${a.atlas_technique || "?"} · ${a.scenario || "?"}`;
+  const score = a.score || {};
+  body.innerHTML = `
+    <div style="display:grid;grid-template-columns:120px 1fr;gap:6px 16px;margin-bottom:14px;">
+      <span style="color:var(--text-dim);">technique</span><span>${a.atlas_technique || "—"} · ${a.atlas_tactic || "—"}</span>
+      <span style="color:var(--text-dim);">target</span><span>${a.target || "—"}</span>
+      <span style="color:var(--text-dim);">result</span><span style="color:${score.jailbreak_success ? "var(--sev-crit)" : "var(--sev-low)"};">${score.jailbreak_success ? "JAILBREAK SUCCESS" : "BLOCKED"}</span>
+      <span style="color:var(--text-dim);">harm_category</span><span>${score.harm_category || "—"}</span>
+      <span style="color:var(--text-dim);">score</span><span>${score.score_value ?? "—"}</span>
+    </div>
+    <div style="margin-bottom:8px;color:var(--text-dim);font-size:11px;">PROMPT</div>
+    <pre style="background:var(--bg-elev-2);padding:10px;border-radius:4px;overflow-x:auto;white-space:pre-wrap;word-break:break-word;color:var(--sev-high);">${(a.prompt || "").replace(/</g,"&lt;")}</pre>
+    <div style="margin:10px 0 8px;color:var(--text-dim);font-size:11px;">RESPONSE</div>
+    <pre style="background:var(--bg-elev-2);padding:10px;border-radius:4px;overflow-x:auto;white-space:pre-wrap;word-break:break-word;">${(a.response || "").replace(/</g,"&lt;")}</pre>
+  `;
 }
 
 // ---------------------------------------------------------------------

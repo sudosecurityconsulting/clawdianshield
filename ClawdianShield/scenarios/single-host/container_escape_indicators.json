@@ -1,0 +1,52 @@
+{
+  "scenario_id": "container_escape_001",
+  "name": "Container Escape Indicators — cgroup Probe, Namespace Check, Mount Leak",
+  "class_name": "container_threat",
+  "mode": "lab_only",
+  "risk_level": "critical",
+  "hosts": ["workstation-1"],
+  "preconditions": ["telemetry collector active", "victim running in Docker"],
+  "behavior_profile": {
+    "container_probe": true,
+    "cleanup": true
+  },
+  "custom_behaviors": {
+    "container_probe": [
+      {"step_id": "cgroup_check", "command": "mkdir -p /tmp/ClawdianShield && cat /proc/1/cgroup > /tmp/ClawdianShield/cgroup_info.txt 2>/dev/null || echo 'no cgroup info' > /tmp/ClawdianShield/cgroup_info.txt"},
+      {"step_id": "container_env_check", "command": "ls /.dockerenv 2>/dev/null && echo 'IS_DOCKER=true' > /tmp/ClawdianShield/container_flags.txt || echo 'IS_DOCKER=false' > /tmp/ClawdianShield/container_flags.txt"},
+      {"step_id": "namespace_probe", "command": "ls -la /proc/1/ns/ > /tmp/ClawdianShield/namespaces.txt 2>/dev/null || echo 'ns probe failed' > /tmp/ClawdianShield/namespaces.txt"},
+      {"step_id": "mount_leak_check", "command": "cat /proc/mounts > /tmp/ClawdianShield/mounts.txt 2>/dev/null || mount > /tmp/ClawdianShield/mounts.txt 2>/dev/null || true"},
+      {"step_id": "socket_probe", "command": "ls -la /var/run/docker.sock /run/docker.sock 2>/dev/null > /tmp/ClawdianShield/docker_socket.txt || echo 'no socket found' > /tmp/ClawdianShield/docker_socket.txt"},
+      {"step_id": "host_path_probe", "command": "ls /host /mnt/host /proc/sysrq-trigger 2>/dev/null >> /tmp/ClawdianShield/container_flags.txt || true"},
+      {"step_id": "capability_dump", "command": "cat /proc/self/status | grep -i 'cap' > /tmp/ClawdianShield/caps.txt 2>/dev/null || echo 'cap read failed' > /tmp/ClawdianShield/caps.txt"},
+      {"step_id": "collect_summary", "command": "cat /tmp/ClawdianShield/cgroup_info.txt /tmp/ClawdianShield/container_flags.txt /tmp/ClawdianShield/caps.txt > /tmp/ClawdianShield/escape_recon.txt 2>/dev/null || true"}
+    ]
+  },
+  "custom_behavior_techniques": {
+    "container_probe": "T1082"
+  },
+  "custom_behavior_produces": {
+    "container_probe": ["file_events", "process_events"]
+  },
+  "expected_telemetry": {
+    "file_events": true,
+    "process_events": true
+  },
+  "detections_expected": [
+    "container_fingerprint_activity",
+    "cgroup_read_detected",
+    "docker_socket_probe",
+    "namespace_enumeration"
+  ],
+  "success_criteria": [
+    "/proc/1/cgroup read generates process_event",
+    "/.dockerenv check and docker socket probe logged",
+    "escape_recon.txt aggregation detected as staging artifact"
+  ],
+  "safety_constraints": {
+    "lab_environment_only": true,
+    "no_real_exploit_logic": true,
+    "no_real_credential_attack_logic": true,
+    "no_unapproved_network_spread": true
+  }
+}

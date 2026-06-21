@@ -290,6 +290,23 @@ def _load_benchmarks(reports_dir: Path) -> list[dict[str, Any]]:
     return results
 
 
+def _load_ai_attacks(evidence_dir: Path) -> list[dict[str, Any]]:
+    """Load PyRIT AI attack events from evidence/ai_events.jsonl."""
+    path = evidence_dir / "ai_events.jsonl"
+    if not path.exists():
+        return []
+    events = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            events.append(json.loads(line))
+        except json.JSONDecodeError:
+            continue
+    return events
+
+
 def build_app(evidence_dir: Path, reports_dir: Path) -> FastAPI:
     app = FastAPI(title="ClawdianShield SOC Console", version="3.1.0")
     static_dir = Path(__file__).parent / "static"
@@ -341,6 +358,30 @@ def build_app(evidence_dir: Path, reports_dir: Path) -> FastAPI:
     @app.get("/api/benchmarks")
     async def benchmarks() -> JSONResponse:
         return JSONResponse(_load_benchmarks(reports_dir))
+
+    @app.get("/api/ai-attacks")
+    async def ai_attacks() -> JSONResponse:
+        return JSONResponse(_load_ai_attacks(evidence_dir))
+
+    @app.get("/api/ai-attacks/stats")
+    async def ai_attack_stats() -> JSONResponse:
+        events = _load_ai_attacks(evidence_dir)
+        total = len(events)
+        successes = sum(1 for e in events if (e.get("score") or {}).get("jailbreak_success"))
+        by_technique = {}
+        by_tactic = {}
+        for e in events:
+            t = e.get("atlas_technique", "unknown")
+            tac = e.get("atlas_tactic", "unknown")
+            by_technique[t] = by_technique.get(t, 0) + 1
+            by_tactic[tac] = by_tactic.get(tac, 0) + 1
+        return JSONResponse({
+            "total": total,
+            "successes": successes,
+            "success_rate_pct": round(successes / total * 100, 2) if total else 0,
+            "by_technique": by_technique,
+            "by_tactic": by_tactic,
+        })
 
     @app.get("/api/runs/{run_id}/benchmark")
     async def run_benchmark(run_id: str) -> JSONResponse:

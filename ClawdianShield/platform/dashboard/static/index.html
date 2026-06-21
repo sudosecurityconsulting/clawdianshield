@@ -25,6 +25,7 @@
     <a data-tab="attack">ATT&amp;CK Map</a>
     <a data-tab="builder">Scenario Builder</a>
     <a data-tab="benchmark">Agent Benchmark</a>
+    <a data-tab="ai-attacks">AI Attacks</a>
   </nav>
   <div class="status-cluster">
     <button id="theme-toggle" class="btn" style="padding: 4px 8px; font-size: 10px;">THEME</button>
@@ -296,6 +297,58 @@
         <p><strong style="color:var(--text);">3. Score the benchmark</strong></p>
         <pre style="background:var(--bg-elev-2);padding:10px;border-radius:4px;overflow-x:auto;">python -m platform.eval.benchmark reports/&lt;run_id&gt;_exec_log.json --agent-name "my-agent"</pre>
         <p style="color:var(--text-dim);font-size:11px;">Agent constraints: victim container runs with <code>network_mode: none</code> and <code>cap_drop: ALL</code>. Use self-contained, file-writing agents. Commercial EDRs requiring network callbacks need the sidecar tier (see docs).</p>
+      </div>
+    </div>
+  </section>
+  <!-- ===================== AI ATTACKS ===================== -->
+  <section class="tab hidden" id="tab-ai-attacks">
+    <div class="kpi-row">
+      <div class="kpi crit"><div class="kpi-label">TOTAL ATTEMPTS</div><div class="kpi-value" id="ai-total">—</div><div class="kpi-foot">PyRIT runs</div></div>
+      <div class="kpi high"><div class="kpi-label">JAILBREAKS</div><div class="kpi-value" id="ai-success">—</div><div class="kpi-foot">successful bypasses</div></div>
+      <div class="kpi"><div class="kpi-label">SUCCESS RATE</div><div class="kpi-value" id="ai-rate">—</div><div class="kpi-foot">% jailbreak success</div></div>
+      <div class="kpi"><div class="kpi-label">TECHNIQUES</div><div class="kpi-value" id="ai-techniques">—</div><div class="kpi-foot">distinct ATLAS TTPs</div></div>
+      <div class="kpi"><div class="kpi-label">TARGET</div><div class="kpi-value" id="ai-target" style="font-size:12px;">—</div><div class="kpi-foot">LLM endpoint</div></div>
+      <div class="kpi"><div class="kpi-label">FRAMEWORK</div><div class="kpi-value" style="font-size:12px;color:var(--accent);">ATLAS</div><div class="kpi-foot">MITRE ATLAS</div></div>
+    </div>
+
+    <div id="ai-no-data" style="display:none;">
+      <div class="panel">
+        <div class="panel-head"><span>NO AI ATTACK RUNS YET</span><span class="panel-sub">PyRIT integration — Phase 4</span></div>
+        <div class="panel-body" style="font-family:var(--mono);font-size:12px;line-height:1.9;color:var(--text-dim);">
+          <p><strong style="color:var(--text);">PyRIT tests ClawdianShield's own AI layer for adversarial robustness.</strong></p>
+          <p>When an adversary controls the log entries that feed the Gemini briefing engine, they can potentially manipulate the AI analyst's conclusions — suppressing detection of their activity or amplifying false leads.</p>
+          <p style="color:var(--text);font-weight:600;">Setup (Phase 4):</p>
+          <pre style="background:var(--bg-elev-2);padding:10px;border-radius:4px;overflow-x:auto;"># Install PyRIT
+pip install pyrit
+
+# Run AI red-team (targets ClawdianShield's /brief endpoint)
+python -m platform.eval.pyrit_runner \
+    --target http://localhost:8088/api/runs/{run_id}/brief \
+    --dataset pyrit/datasets/jailbreak/templates/ \
+    --output evidence/ai_events.jsonl</pre>
+          <p style="font-size:11px;color:var(--text-dim);">Results map to <strong>MITRE ATLAS</strong> (Adversarial Threat Landscape for AI Systems). Tracked techniques include AML.T0054 (LLM Prompt Injection), AML.T0051 (LLM Jailbreak), AML.T0048 (Societal Harm).</p>
+        </div>
+      </div>
+    </div>
+
+    <div id="ai-data-view">
+      <div class="grid-2c">
+        <div class="panel">
+          <div class="panel-head"><span>ATTACK LOG</span><span class="panel-sub">evidence/ai_events.jsonl · newest first</span></div>
+          <table class="data-table" id="tbl-ai-attacks">
+            <thead><tr><th>timestamp</th><th>technique</th><th>scenario</th><th>result</th><th>score</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><span>ATLAS TECHNIQUE DISTRIBUTION</span><span class="panel-sub">attempts per TTP</span></div>
+          <div class="panel-body"><canvas id="chart-atlas-techniques"></canvas></div>
+        </div>
+      </div>
+
+      <div class="panel" id="ai-detail-panel" style="display:none;">
+        <div class="panel-head"><span>PROMPT DETAIL</span><span class="panel-sub" id="ai-detail-meta">select an attack</span></div>
+        <div class="panel-body" id="ai-detail-body" style="font-family:var(--mono);font-size:12px;line-height:1.7;"></div>
       </div>
     </div>
   </section>

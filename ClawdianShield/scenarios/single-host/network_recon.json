@@ -1,0 +1,51 @@
+{
+  "scenario_id": "network_recon_001",
+  "name": "Network Recon — Host Discovery, Port Survey, ARP Sweep",
+  "class_name": "discovery",
+  "mode": "lab_only",
+  "risk_level": "medium",
+  "hosts": ["workstation-1"],
+  "preconditions": ["telemetry collector active"],
+  "behavior_profile": {
+    "net_recon": true,
+    "cleanup": true
+  },
+  "custom_behaviors": {
+    "net_recon": [
+      {"step_id": "hosts_read", "command": "mkdir -p /tmp/ClawdianShield && cat /etc/hosts > /tmp/ClawdianShield/hosts_dump.txt"},
+      {"step_id": "resolv_read", "command": "cat /etc/resolv.conf > /tmp/ClawdianShield/dns_config.txt 2>/dev/null || echo 'no resolv.conf' > /tmp/ClawdianShield/dns_config.txt"},
+      {"step_id": "interface_enum", "command": "ip addr show > /tmp/ClawdianShield/ifaces.txt 2>/dev/null || ifconfig -a > /tmp/ClawdianShield/ifaces.txt 2>/dev/null || true"},
+      {"step_id": "route_table", "command": "ip route show > /tmp/ClawdianShield/routes.txt 2>/dev/null || route -n > /tmp/ClawdianShield/routes.txt 2>/dev/null || true"},
+      {"step_id": "open_ports", "command": "ss -tlnp > /tmp/ClawdianShield/open_ports.txt 2>/dev/null || netstat -tlnp > /tmp/ClawdianShield/open_ports.txt 2>/dev/null || true"},
+      {"step_id": "arp_sweep_sim", "command": "for ip in 10.0.0.1 10.0.0.2 10.0.0.3 172.16.0.1 192.168.1.1; do echo \"$ip\" >> /tmp/ClawdianShield/arp_targets.txt; done"},
+      {"step_id": "proc_net_read", "command": "cat /proc/net/tcp 2>/dev/null | head -20 > /tmp/ClawdianShield/proc_net.txt || echo 'no proc/net' > /tmp/ClawdianShield/proc_net.txt"},
+      {"step_id": "collect_results", "command": "cat /tmp/ClawdianShield/ifaces.txt /tmp/ClawdianShield/routes.txt /tmp/ClawdianShield/open_ports.txt > /tmp/ClawdianShield/net_summary.txt 2>/dev/null || true"}
+    ]
+  },
+  "custom_behavior_techniques": {
+    "net_recon": "T1046"
+  },
+  "custom_behavior_produces": {
+    "net_recon": ["file_events", "process_events"]
+  },
+  "expected_telemetry": {
+    "file_events": true,
+    "process_events": true
+  },
+  "detections_expected": [
+    "network_discovery_activity",
+    "proc_net_access",
+    "port_scan_artifact_written"
+  ],
+  "success_criteria": [
+    "ifaces.txt / routes.txt creation produces file_events",
+    "/proc/net/tcp read generates process_events",
+    "arp sweep target list written as staging artifact"
+  ],
+  "safety_constraints": {
+    "lab_environment_only": true,
+    "no_real_exploit_logic": true,
+    "no_real_credential_attack_logic": true,
+    "no_unapproved_network_spread": true
+  }
+}

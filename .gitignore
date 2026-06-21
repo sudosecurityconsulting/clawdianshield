@@ -14,6 +14,17 @@ clawdianshield/intelligence/gemini_bridge.py
 Roo-Code
 Zoo-Code
 
+# Downloaded external toolkits — large, regeneratable, not part of this project's source
+PyRIT-main/
+PyRIT-main.zip
+ERAT-main/
+antigravity-sdk-python-main/
+antigravity-sdk-python-main.zip
+
+# Atomic Red Team vendor checkout + generated scenario JSONs (218MB+, regenerate with atomic_converter.py)
+ClawdianShield/vendor/
+ClawdianShield/scenarios/atomic/
+
 # One-off / throwaway patch scripts
 fix_*.py
 

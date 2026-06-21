@@ -1,0 +1,57 @@
+{
+  "scenario_id": "lotl_chain_001",
+  "name": "Living off the Land — Built-in Recon & Execution",
+  "class_name": "defense_evasion",
+  "mode": "lab_only",
+  "risk_level": "high",
+  "hosts": ["workstation-1"],
+  "preconditions": ["telemetry collector active"],
+  "behavior_profile": {
+    "lotl_recon": true,
+    "lotl_exec": true,
+    "cleanup": true
+  },
+  "custom_behaviors": {
+    "lotl_recon": [
+      {"step_id": "system_info", "command": "mkdir -p /tmp/ClawdianShield && uname -a > /tmp/ClawdianShield/sysinfo.txt && cat /etc/os-release >> /tmp/ClawdianShield/sysinfo.txt 2>/dev/null || true"},
+      {"step_id": "user_enum", "command": "id && whoami && cat /etc/passwd | cut -d: -f1,3,7 > /tmp/ClawdianShield/users.txt"},
+      {"step_id": "process_enum", "command": "ps aux > /tmp/ClawdianShield/procs.txt 2>/dev/null || ps -ef > /tmp/ClawdianShield/procs.txt"},
+      {"step_id": "network_enum", "command": "cat /etc/hosts > /tmp/ClawdianShield/hosts.txt && ss -tlnp >> /tmp/ClawdianShield/hosts.txt 2>/dev/null || netstat -tlnp >> /tmp/ClawdianShield/hosts.txt 2>/dev/null || true"},
+      {"step_id": "storage_enum", "command": "df -h > /tmp/ClawdianShield/disks.txt && mount | grep -v 'proc\\|sys\\|cgroup' >> /tmp/ClawdianShield/disks.txt 2>/dev/null || true"}
+    ],
+    "lotl_exec": [
+      {"step_id": "b64_payload", "command": "echo 'aWQgJiYgaG9zdG5hbWU=' | base64 -d > /tmp/ClawdianShield/payload.sh && chmod +x /tmp/ClawdianShield/payload.sh"},
+      {"step_id": "exec_via_sh", "command": "sh /tmp/ClawdianShield/payload.sh > /tmp/ClawdianShield/payload_out.txt 2>&1"},
+      {"step_id": "exec_via_awk", "command": "awk 'BEGIN{cmd=\"id\"; while((cmd | getline line)>0){print line}; close(cmd)}' > /tmp/ClawdianShield/awk_out.txt 2>/dev/null || true"},
+      {"step_id": "exec_via_find", "command": "find /tmp/ClawdianShield -name 'payload.sh' -exec sh {} \\; > /tmp/ClawdianShield/find_exec_out.txt 2>&1 || true"}
+    ]
+  },
+  "custom_behavior_techniques": {
+    "lotl_recon": "T1082",
+    "lotl_exec": "T1059.004"
+  },
+  "custom_behavior_produces": {
+    "lotl_recon": ["process_events", "file_events"],
+    "lotl_exec": ["process_events", "file_events"]
+  },
+  "expected_telemetry": {
+    "file_events": true,
+    "process_events": true
+  },
+  "detections_expected": [
+    "system_recon_detected",
+    "encoded_payload_execution",
+    "living_off_land_binary_abuse"
+  ],
+  "success_criteria": [
+    "base64-encoded payload decoded and executed",
+    "awk/find exec-via-built-in produces process_events",
+    "enumeration files appear in file_events"
+  ],
+  "safety_constraints": {
+    "lab_environment_only": true,
+    "no_real_exploit_logic": true,
+    "no_real_credential_attack_logic": true,
+    "no_unapproved_network_spread": true
+  }
+}
